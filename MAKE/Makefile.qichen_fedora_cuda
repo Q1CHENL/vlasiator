@@ -1,0 +1,77 @@
+#
+# CUDA-enabled Makefile for Vlasov solvers
+#
+
+#======= Enable CUDA Compilation =======
+USE_CUDA=1
+
+#======== Vectorization ==========
+ifeq ($(DISTRIBUTION_FP_PRECISION),SPF)
+	VECTORCLASS = VEC_FALLBACK_GENERIC
+else
+	VECTORCLASS = VEC_FALLBACK_GENERIC
+endif
+
+#===== Vector Lengths ====
+WID=4
+VECL=16
+
+#======= GPU architecture =========
+GPU_ARCH = sm_75  # adjust to your GPU compute capability
+
+#======= Compiler =========
+CMP = nvcc -ccbin g++
+LNK = nvcc -ccbin g++
+
+#======= Include paths =========
+INC_HOME    = -I$(HOME)/include
+INC_SYSTEM  = -I/usr/include
+INC_MPI     = -I/usr/include/openmpi-x86_64
+INC_CUDA    = -isystem $(SPACK_ROOT)/opt/spack/linux-skylake/cuda-12.3.2-*/include
+
+INC_BOOST = -I$(SPACK_ROOT)/opt/spack/linux-skylake/boost-1.72.0-inaykjfbdit2rtwzsmjkd76lrdhnwaot/include
+INC_ZOLTAN  = -I/home/qichen/Dev/Zoltan/src/include \
+              -I/home/qichen/Dev/zoltan-build/src/include
+INC_VLSV    = -I/home/qichen/Dev/vlsv
+INC_SILO    = -I/home/qichen/local/silo/include
+INC_PROFILE = -I/home/qichen/Dev/phiprof/include
+INC_EIGEN   = -isystem ./submodules/eigen/
+INC_DCCRG   = -I./submodules/dccrg
+INC_FSGRID  = -I./submodules/fsgrid
+INC_HASHINATOR = -isystem ./submodules/hashinator/
+
+CXXFLAGS = -g -O3 -x cu -std=c++17 \
+           --extended-lambda --expt-relaxed-constexpr \
+           -gencode arch=compute_75,code=sm_75 \
+           --generate-line-info \
+           -Xcompiler -fopenmp \
+           -Xcompiler="-Wall -W -pedantic -Wno-unused -Wno-unused-parameter -Wno-missing-braces -fpermissive" \
+           -Xcudafe --diag_suppress=3128 \
+           $(INC_HOME) $(INC_SYSTEM) $(INC_MPI) $(INC_CUDA) \
+           $(INC_BOOST) $(INC_ZOLTAN) $(INC_VLSV) $(INC_SILO) $(INC_PROFILE) \
+           $(INC_EIGEN) $(INC_DCCRG) $(INC_FSGRID) $(INC_HASHINATOR)
+
+MATHFLAGS = --use_fast_math
+
+#======= Library paths =========
+LIB_HOME    = -L$(HOME)/lib
+LIB_CUDA    = -L$(SPACK_ROOT)/opt/spack/linux-skylake/cuda-12.3.2-*/lib64
+LIB_BOOST = -L$(SPACK_ROOT)/opt/spack/linux-skylake/boost-1.72.0-inaykjfbdit2rtwzsmjkd76lrdhnwaot/lib -lboost_program_options
+LIB_ZOLTAN = -L/home/qichen/Dev/zoltan-build/src -lzoltan
+LIB_VLSV    = -L/home/qichen/Dev/vlsv -lvlsv
+LIB_SILO    = -L/home/qichen/local/silo/lib -lsilo
+LIB_PROFILE = -L/home/qichen/Dev/phiprof/lib -lphiprof
+
+# MPI + OpenMP
+# Use Spack OpenMPI if installed; else remove -lmpi and rely on mpic++ wrapper
+
+MPI_LIB_PATH = -L/usr/lib64/openmpi/lib
+LIB_MPI = $(MPI_LIB_PATH) -lmpi -lgomp
+
+
+# Add -lnvToolsExt for nvtx profiling
+# Linker flags with proper rpath handling for nvcc
+LDFLAGS = -g $(LIB_HOME) $(LIB_CUDA) \
+          -Xlinker -rpath -Xlinker /usr/lib64/openmpi/lib \
+          $(LIB_BOOST) $(LIB_ZOLTAN) $(LIB_VLSV) $(LIB_SILO) $(LIB_PROFILE) \
+          $(LIB_MPI)

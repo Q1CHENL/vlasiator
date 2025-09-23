@@ -1,0 +1,52 @@
+CMP = mpic++
+LNK = mpic++
+
+#======== Vectorization ==========
+#Set vector backend type for vlasov solvers, sets precision and length. 
+#NOTE this has to have the same precision as the distribution function define (DISTRIBUTION_FP_PRECISION)
+#Options: 
+# AVX:	    VEC4D_AGNER, VEC4F_AGNER, VEC8F_AGNER
+# AVX512:   VEC8D_AGNER, VEC16F_AGNER
+# Fallback: VEC4D_FALLBACK, VEC4F_FALLBACK, VEC8F_FALLBACK
+
+ifeq ($(DISTRIBUTION_FP_PRECISION),SPF)
+#Single-precision        
+	VECTORCLASS = VEC8F_AGNER
+else
+#Double-precision
+	VECTORCLASS = VEC4D_AGNER
+endif
+
+FLAGS =
+# note: std was c++11
+# note: testpackage settings missing
+CXXFLAGS = -I$(HOME)/include -I/usr/include -L$(HOME)/lib -L/usr/lib -O3 -funroll-loops -std=c++17 -W -Wall -pedantic -Wno-unused -Wno-unused-parameter -Wno-missing-braces  -fopenmp
+#CXXFLAGS = -I$(HOME)/include -L$(HOME)/lib -O0 -funroll-loops -std=c++17 -W -Wall -pedantic -Wno-unused -Wno-unused-parameter -Wno-missing-braces -g -fopenmp
+MATHFLAGS = -ffast-math -fno-finite-math-only
+testpackage: MATHFLAGS = -fno-unsafe-math-optimizations
+LDFLAGS = -L $(HOME)/lib
+LIB_MPI = -lgomp
+# LIB_MPI = 
+
+LIBRARY_PREFIX = $(HOME)
+LIBRARY_PREFIX_B = $(HOME)
+
+INC_BOOST = -I${HOME}/include
+LIB_BOOST = -L${HOME}/lib -lboost_program_options
+
+INC_ZOLTAN = -I/home/qichen/local/zoltan/include
+LIB_ZOLTAN = -L/home/qichen/local/zoltan/lib -lzoltan
+
+INC_VLSV = -I/home/qichen/Dev/vlsv
+LIB_VLSV = -L/home/qichen/Dev/vlsv -lvlsv
+
+INC_SILO = -I/home/qichen/local/silo/include
+LIB_SILO = -L/home/qichen/local/silo/lib -lsilo
+
+INC_PROFILE = -I/home/qichen/Dev/phiprof/include
+LIB_PROFILE = -L/home/qichen/Dev/phiprof/lib -lphiprof
+
+INC_TOPO =
+
+INC_VECTORCLASS = -isystem ./submodules/vectorclass/ -isystem ./submodules/vectorclass-addon/vector3d/
+INC_EIGEN = -isystem ./submodules/eigen/
