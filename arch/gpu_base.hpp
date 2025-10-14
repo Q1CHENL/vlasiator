@@ -47,7 +47,9 @@ static const double BLOCK_ALLOCATION_FACTOR = 1.2;
 static const int TRANSLATION_BUFFER_ALLOCATION_FACTOR = 5;
 
 #define DIMS 1
-#define MAXCPUTHREADS 64
+// Maximum number of CPU threads supported for per-thread GPU resources.
+// Increased to avoid out-of-bounds when OMP uses >64 threads on some clusters.
+#define MAXCPUTHREADS 256
 
 void gpu_init_device();
 void gpu_clear_device();
@@ -56,6 +58,105 @@ gpuStream_t gpu_getPriorityStream();
 uint gpu_getThread();
 uint gpu_getMaxThreads();
 int gpu_getDevice();
+uint gpu_getAllocatedThreads();
+
+// Optional low-level GPU pointer debugging helpers (CUDA/HIP specific)
+// Enable verbose pointer attribute prints by defining GPU_DEBUG_PTRS in compile flags
+#if defined(USE_GPU)
+#if defined(__CUDACC__)
+#include <cuda_runtime.h>
+inline static const char* gpu_mem_type_str(cudaMemoryType t) {
+   switch (t) {
+      case cudaMemoryTypeUnregistered: return "unregistered";
+      case cudaMemoryTypeHost:         return "host";
+      case cudaMemoryTypeDevice:       return "device";
+      case cudaMemoryTypeManaged:      return "managed";
+      default:                         return "unknown";
+   }
+}
+inline static void gpu_debug_pointer(const void* p, const char* name) {
+#ifdef GPU_DEBUG_PTRS
+   cudaPointerAttributes attr;
+   cudaError_t st = cudaPointerGetAttributes(&attr, p);
+   if (st == cudaSuccess) {
+#if CUDART_VERSION >= 10000
+      // Newer CUDA uses attr.type
+      printf("[GPU-DBG] %s=%p type=%s device=%d devicePointer=%p hostPointer=%p\n",
+             name, p,
+             (attr.type==cudaMemoryTypeDevice?"device":(attr.type==cudaMemoryTypeHost?"host":(attr.type==cudaMemoryTypeManaged?"managed":"unknown"))),
+             attr.device,
+             attr.devicePoin  ter,
+             attr.hostPointer);
+#else
+      // Older CUDA uses attr.memoryType
+      printf("[GPU-DBG] %s=%p type=%s devicePointer=%p hostPointer=%p\n",
+             name, p, gpu_mem_type_str(attr.memoryType), attr.devicePointer, attr.hostPointer);
+#endif
+   } else {
+      printf("[GPU-DBG] %s=%p cudaPointerGetAttributes error: %s\n", name, p, cudaGetErrorString(st));
+   }
+#else
+   (void)p; (void)name; // no-op
+#endif
+}
+#if defined(__CUDACC__)
+inline static bool gpu_can_memop(const void* p) {
+   if (!p) return false;
+   cudaPointerAttributes attr;
+   if (cudaPointerGetAttributes(&attr, p) != cudaSuccess) return false;
+#if CUDART_VERSION >= 10000
+   return (attr.type == cudaMemoryTypeDevice || attr.type == cudaMemoryTypeManaged);
+#else
+   return (attr.memoryType == cudaMemoryTypeDevice || attr.memoryType == cudaMemoryTypeManaged);
+#endif
+}
+#else
+inline static bool gpu_can_memop(const void* p) { return p != nullptr; }
+#endif
+
+// Safe, logging memset-async for debug; returns true if memset attempted and succeeded
+inline static bool gpu_try_memset_async(void* ptr, int value, size_t bytes, gpuStream_t stream) {
+   if (!gpu_can_memop(ptr)) return false;
+#if defined(__CUDACC__)
+   cudaError_t err = cudaMemsetAsync(ptr, value, bytes, stream);
+   if (err != cudaSuccess) {
+      printf("[GPU-DBG] cudaMemsetAsync failed on %p: %s (skipping)\n", ptr, cudaGetErrorString(err));
+      return false;
+   }
+   return true;
+#elif defined(__HIP_PLATFORM_HCC___)
+   hipError_t err = hipMemsetAsync(ptr, value, bytes, stream);
+   if (err != hipSuccess) {
+      printf("[GPU-DBG] hipMemsetAsync failed on %p: %d (skipping)\n", ptr, (int)err);
+      return false;
+   }
+   return true;
+#else
+   (void)ptr; (void)value; (void)bytes; (void)stream; return false;
+#endif
+}
+#elif defined(__HIP_PLATFORM_HCC___)
+#include <hip/hip_runtime.h>
+inline static void gpu_debug_pointer(const void* p, const char* name) {
+#ifdef GPU_DEBUG_PTRS
+   hipPointerAttribute_t attr{};
+   hipError_t st = hipPointerGetAttributes(&attr, const_cast<void*>(p));
+   if (st == hipSuccess) {
+      printf("[GPU-DBG] %s=%p memoryType=%d device=%d devicePointer=%p hostPointer=%p\n",
+             name, p, attr.memoryType, attr.device, attr.devicePointer, attr.hostPointer);
+   } else {
+      printf("[GPU-DBG] %s=%p hipPointerGetAttributes error: %d\n", name, p, (int)st);
+   }
+#else
+   (void)p; (void)name;
+#endif
+}
+#else
+inline static void gpu_debug_pointer(const void* p, const char* name) { (void)p; (void)name; }
+#endif
+#else
+inline static void gpu_debug_pointer(const void* p, const char* name) { (void)p; (void)name; }
+#endif
 
 void gpu_vlasov_allocate(uint maxBlockCount);
 void gpu_vlasov_deallocate();
@@ -189,6 +290,11 @@ extern split::SplitVector<vmesh::GlobalID> *gpu_list_with_replace_new[];
 extern split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>> *gpu_list_delete[];
 extern split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>> *gpu_list_to_replace[];
 extern split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>> *gpu_list_with_replace_old[];
+// Device copies of SplitVector objects for safe kernel use
+extern split::SplitVector<vmesh::GlobalID> *gpu_list_with_replace_new_dev[];
+extern split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>> *gpu_list_delete_dev[];
+extern split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>> *gpu_list_to_replace_dev[];
+extern split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>> *gpu_list_with_replace_old_dev[];
 
 // SplitVector information structs for use in fetching sizes and capacities without page faulting
 // extern split::SplitInfo *info_1[];

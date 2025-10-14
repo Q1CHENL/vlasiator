@@ -35,6 +35,7 @@
 
 int myDevice;
 int myRank;
+static uint gpuAllocatedThreads = 0;
 
 // Allocate pointers for per-thread memory regions
 gpuStream_t gpuStreamList[MAXCPUTHREADS];
@@ -68,6 +69,11 @@ split::SplitVector<vmesh::GlobalID> *gpu_list_with_replace_new[MAXCPUTHREADS];
 split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>> *gpu_list_delete[MAXCPUTHREADS];
 split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>> *gpu_list_to_replace[MAXCPUTHREADS];
 split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>> *gpu_list_with_replace_old[MAXCPUTHREADS];
+// Device copies of the SplitVector objects
+split::SplitVector<vmesh::GlobalID> *gpu_list_with_replace_new_dev[MAXCPUTHREADS];
+split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>> *gpu_list_delete_dev[MAXCPUTHREADS];
+split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>> *gpu_list_to_replace_dev[MAXCPUTHREADS];
+split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>> *gpu_list_with_replace_old_dev[MAXCPUTHREADS];
 
 // Vectors and set for use in translation
 split::SplitVector<vmesh::VelocityMesh*> *allVmeshPointer;
@@ -122,6 +128,14 @@ __host__ uint gpu_getMaxThreads() {
 
 __host__ void gpu_init_device() {
    const uint maxNThreads = gpu_getMaxThreads();
+   if (maxNThreads > MAXCPUTHREADS) {
+      fprintf(stderr,
+              "[GPU-ERR] OpenMP max threads (%u) exceed MAXCPUTHREADS (%u).\n"
+              "         Increase MAXCPUTHREADS in arch/gpu_base.hpp and rebuild,\n"
+              "         or set OMP_NUM_THREADS <= %u to proceed safely.\n",
+              maxNThreads, (unsigned)MAXCPUTHREADS, (unsigned)MAXCPUTHREADS);
+      abort();
+   }
    // int deviceCount;
    // CHK_ERR( gpuFree(0));
    // CHK_ERR( gpuGetDeviceCount(&deviceCount) );
@@ -202,9 +216,7 @@ __host__ void gpu_init_device() {
       // CHK_ERR( gpuMallocHost((void **) &info_4[i], sizeof(split::SplitInfo)) );
       // CHK_ERR( gpuMallocHost((void **) &info_m[i], sizeof(Hashinator::MapInfo)) );
    }
-   CHK_ERR( gpuMalloc((void**)&dev_pencilOrderedPointers, maxNThreads*sizeof(Vec*)) );
-   CHK_ERR( gpuMallocHost((void **)&host_pencilOrderedPointers, maxNThreads*sizeof(Vec*)) );
-
+   gpuAllocatedThreads = maxNThreads;
    CHK_ERR( gpuMalloc((void**)&gpu_vcell_transpose, WID3*sizeof(uint)) );
    CHK_ERR( gpuMalloc((void**)&invalidGIDpointer, sizeof(vmesh::GlobalID)) );
    vmesh::GlobalID invalidGIDvalue = vmesh::INVALID_GLOBALID;
@@ -248,6 +260,10 @@ __host__ int gpu_getDevice() {
    int device;
    CHK_ERR( gpuGetDevice(&device) );
    return device;
+}
+
+__host__ uint gpu_getAllocatedThreads() {
+   return gpuAllocatedThreads ? gpuAllocatedThreads : gpu_getMaxThreads();
 }
 
 /*
@@ -461,6 +477,12 @@ __host__ void gpu_blockadjust_allocate_perthread(
    gpu_list_to_replace[cpuThreadID] = new split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>(newSize);
    gpu_list_with_replace_old[cpuThreadID] = new split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>(newSize);
 
+   // Upload host objects to device (device-side mirror objects)
+   gpu_list_with_replace_new_dev[cpuThreadID] = gpu_list_with_replace_new[cpuThreadID]->upload();
+   gpu_list_delete_dev[cpuThreadID]          = gpu_list_delete[cpuThreadID]->upload();
+   gpu_list_to_replace_dev[cpuThreadID]      = gpu_list_to_replace[cpuThreadID]->upload();
+   gpu_list_with_replace_old_dev[cpuThreadID]= gpu_list_with_replace_old[cpuThreadID]->upload();
+
    // Store size of new allocation
    gpu_blockadjust_allocatedSize[cpuThreadID] = newSize;
    //printf("Allocated buffers for thread %lu with newSize %lu and vector length %lu = %lu \n",(long unsigned)cpuThreadID,(long unsigned)newSize,(long unsigned)loopReserve,(long unsigned)gpu_list_with_replace_new[cpuThreadID]->capacity());
@@ -476,6 +498,11 @@ __host__ void gpu_blockadjust_deallocate_perthread (
    delete gpu_list_delete[cpuThreadID];
    delete gpu_list_to_replace[cpuThreadID];
    delete gpu_list_with_replace_old[cpuThreadID];
+   // Device mirrors are freed when host objects are deleted; clear pointers
+   gpu_list_with_replace_new_dev[cpuThreadID] = nullptr;
+   gpu_list_delete_dev[cpuThreadID] = nullptr;
+   gpu_list_to_replace_dev[cpuThreadID] = nullptr;
+   gpu_list_with_replace_old_dev[cpuThreadID] = nullptr;
    gpu_blockadjust_allocatedSize[cpuThreadID] = 0;
 }
 

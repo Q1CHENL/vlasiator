@@ -238,6 +238,10 @@ __global__ void resize_vbc_kernel_pre(
    vmesh::LocalID* returnLID, // return values: nbefore, nafter, nblockstochange, resize success
    Realf* gpu_rhoLossAdjust // mass loss, set to zero
    ) {
+   if (threadIdx.x==0 && blockIdx.x==0) {
+      // printf("[KDBG pre] vmesh=%p vbc=%p new=%p del=%p rep=%p old=%p ret=%p rho=%p\n",
+            //  vmesh, blockContainer, list_with_replace_new, list_delete, list_to_replace, list_with_replace_old, returnLID, gpu_rhoLossAdjust);
+   }
    const vmesh::LocalID n_to_replace = list_to_replace->size(); // replace these blocks
    const vmesh::LocalID n_with_replace_new = list_with_replace_new->size(); // use to replace, or add at end
    const vmesh::LocalID n_with_replace_old = list_with_replace_old->size(); // use to replace
@@ -255,7 +259,7 @@ __global__ void resize_vbc_kernel_pre(
    //OR?
    const vmesh::LocalID nBlocksToChange = nToAdd > nToRemove ? nToAdd : nToRemove;
 
-   gpu_rhoLossAdjust[0] = 0.0;
+   gpu_rhoLossAdjust[0] = 0.0f;
    returnLID[0] = nBlocksBeforeAdjust;
    returnLID[1] = nBlocksAfterAdjust;
    returnLID[2] = nBlocksToChange;
@@ -315,13 +319,33 @@ __global__ void __launch_bounds__(WID3,4) update_velocity_blocks_kernel(
 
    const int b_tid = ti % WID3; // [0,WID3)
 
+   if (!list_with_replace_new || !list_delete || !list_to_replace || !list_with_replace_old) {
+      // if (ti==0) printf("[KDBG upd] Null list pointer(s): add=%p del=%p rep=%p old=%p\n",
+      //                   list_with_replace_new, list_delete, list_to_replace, list_with_replace_old);
+      return;
+   }
    const vmesh::LocalID n_with_replace_new = list_with_replace_new->size();
    const vmesh::LocalID n_delete = list_delete->size();
    const vmesh::LocalID n_to_replace = list_to_replace->size();
    const vmesh::LocalID n_with_replace_old = list_with_replace_old->size();
+   if (ti==0) {
+      // printf("[KDBG upd] blk=%u sizes: add_new=%u del=%u rep=%u add_old=%u before=%u tochange=%u after=%u\n",
+      //        (unsigned)blockIdx.x,
+      //        (unsigned)n_with_replace_new,
+      //        (unsigned)n_delete,
+      //        (unsigned)n_to_replace,
+      //        (unsigned)n_with_replace_old,
+      //        (unsigned)nBlocksBeforeAdjust,
+      //        (unsigned)nBlocksToChange,
+      //        (unsigned)nBlocksAfterAdjust);
+   }
+   if (blockIdx.x >= nBlocksToChange) return;
    // For tracking mass-loss
    //__shared__ Realf massloss[blockSize];
    __shared__ Realf massloss[WID3];
+
+   // Defensive: capture current block container size to validate LIDs used below
+   const vmesh::LocalID vbcSize = blockContainer->size();
 
    // Each block / workunit Processes one block from the lists.
 
@@ -374,6 +398,14 @@ __global__ void __launch_bounds__(WID3,4) update_velocity_blocks_kernel(
          return;
       }
       #endif
+
+      // Bounds check for safety
+      if (rmLID >= vbcSize) {
+         if (b_tid==0) {
+            // printf("[KDBG upd] delete-path: rmLID %u out of range (vbcSize=%u)\n", (unsigned)rmLID, (unsigned)vbcSize);
+         }
+         return;
+      }
 
       // Track mass loss:
       Realf* rm_avgs = blockContainer->getData(rmLID);
@@ -449,6 +481,14 @@ __global__ void __launch_bounds__(WID3,4) update_velocity_blocks_kernel(
       }
       #endif
 
+      // Bounds check for safety
+      if (rmLID >= vbcSize) {
+         if (b_tid==0) {
+            // printf("[KDBG upd] replace-path: rmLID %u out of range (vbcSize=%u)\n", (unsigned)rmLID, (unsigned)vbcSize);
+         }
+         return;
+      }
+
       // Track mass loss:
       Realf* rm_avgs = blockContainer->getData(rmLID);
       Real* rm_block_parameters = blockContainer->getParameters(rmLID);
@@ -485,6 +525,13 @@ __global__ void __launch_bounds__(WID3,4) update_velocity_blocks_kernel(
          replaceLID = ((*list_with_replace_old)[index]).second;
          #endif
 
+         // Additional bounds check for replacement source LID
+         if (replaceLID >= vbcSize) {
+            if (b_tid==0) {
+               // printf("[KDBG upd] replace-path: replaceLID %u out of range (vbcSize=%u)\n", (unsigned)replaceLID, (unsigned)vbcSize);
+            }
+            return;
+         }
          Realf* repl_avgs = blockContainer->getData(replaceLID);
          Real*  repl_block_parameters = blockContainer->getParameters(replaceLID);
          rm_avgs[b_tid] = repl_avgs[b_tid];
@@ -550,6 +597,14 @@ __global__ void __launch_bounds__(WID3,4) update_velocity_blocks_kernel(
 
       // We need to add the data of addGID to a new LID. Here we still use the regular index.
       const vmesh::LocalID addLID = nBlocksBeforeAdjust + index;
+      // Bounds check for safety (capacity check for add path)
+      if (addLID >= blockContainer->capacity()) {
+         if (b_tid==0) {
+            // printf("[KDBG upd] add-path: addLID %u exceeds capacity %u (before=%u index=%u)\n",
+            //        (unsigned)addLID, (unsigned)blockContainer->capacity(), (unsigned)nBlocksBeforeAdjust, (unsigned)index);
+         }
+         return;
+      }
       Realf* add_avgs = blockContainer->getData(addLID);
       #ifdef DEBUG_SPATIAL_CELL
       if (addGID == vmesh->invalidGlobalID()) {
@@ -1077,23 +1132,168 @@ namespace spatial_cell {
       vmesh::LocalID host_returnLID[4];
 
       const uint cpuThreadID = gpu_getThread();
+      const uint maxThreadsAllocated = gpu_getAllocatedThreads();
+      // fprintf(stderr, "[HOST-DBG] adjust_caller: entry thread=%u / max=%u pop=%u\n", cpuThreadID, maxThreadsAllocated, popID);
+      fflush(stderr);
+      if (cpuThreadID >= maxThreadsAllocated) {
+         // Hard stop to avoid indexing per-thread buffers out-of-bounds
+         fprintf(stderr,
+                 "[GPU-ERR] cpuThreadID %u exceeds allocated GPU per-thread buffers (%u). Check OMP_NUM_THREADS and MAXCPUTHREADS.\n",
+                 cpuThreadID, maxThreadsAllocated);
+         abort();
+      }
       const gpuStream_t stream = gpu_getStream();
+
+      // Ensure per-thread block-adjust lists are allocated before use
+      if (gpu_blockadjust_allocatedSize[cpuThreadID] == 0) {
+         uint reserve = populations[popID].vmesh ? populations[popID].vmesh->size() : 100;
+         if (reserve < 100) reserve = 100;
+         gpu_blockadjust_allocate_perthread(cpuThreadID, reserve);
+      }
+      // Double-check lists exist; if missing, try allocating again and bail safely if still null
+      if (!gpu_list_with_replace_new[cpuThreadID] || !gpu_list_delete[cpuThreadID] ||
+     !gpu_list_to_replace[cpuThreadID] || !gpu_list_with_replace_old[cpuThreadID]) {
+   //  fprintf(stderr,
+   //     "[HOST-DBG] adjust_caller: null list(s) after ensure (thread=%u) add=%p del=%p rep=%p old=%p\n",
+   //     cpuThreadID,
+   //     (void*)gpu_list_with_replace_new[cpuThreadID],
+   //     (void*)gpu_list_delete[cpuThreadID],
+   //     (void*)gpu_list_to_replace[cpuThreadID],
+   //     (void*)gpu_list_with_replace_old[cpuThreadID]);
+    fflush(stderr);
+    uint reserve2 = populations[popID].vmesh ? populations[popID].vmesh->size() : 100;
+    if (reserve2 < 100) reserve2 = 100;
+    gpu_blockadjust_allocate_perthread(cpuThreadID, reserve2);
+      }
+      if (!gpu_list_with_replace_new[cpuThreadID] || !gpu_list_delete[cpuThreadID] ||
+     !gpu_list_to_replace[cpuThreadID] || !gpu_list_with_replace_old[cpuThreadID]) {
+    fprintf(stderr,
+       "[HOST-ERR] adjust_caller: lists still null; skipping adjust (thread=%u) add=%p del=%p rep=%p old=%p\n",
+       cpuThreadID,
+       (void*)gpu_list_with_replace_new[cpuThreadID],
+       (void*)gpu_list_delete[cpuThreadID],
+       (void*)gpu_list_to_replace[cpuThreadID],
+       (void*)gpu_list_with_replace_old[cpuThreadID]);
+    fflush(stderr);
+    // Return current size as no-op to avoid crash
+    return populations[popID].vmesh ? populations[popID].vmesh->size() : 0;
+      }
+   // fprintf(stderr, "[HOST-DBG] adjust_caller: thread=%u pop=%u begin\n", cpuThreadID, popID);
+      fflush(stderr);
+      // Initialize return buffers (only if device/managed) and print pointer attributes
+      // Print raw pointer states before any memops to help pinpoint host segfaults
+      // fprintf(stderr,
+      //         "[HOST-DBG] adjust_caller: pre-memset ptrs (thread=%u) base returnLID=%p returnRealf=%p elem returnLID=%p returnRealf=%p stream=%p\n",
+      //         cpuThreadID,
+      //         (void*)returnLID,
+      //         (void*)returnRealf,
+      //         (returnLID ? (void*)returnLID[cpuThreadID] : (void*)nullptr),
+      //         (returnRealf ? (void*)returnRealf[cpuThreadID] : (void*)nullptr),
+      //         (void*)stream);
+      fflush(stderr);
+
+      // Only attempt memsets if arrays and elements exist
+      if (returnLID && returnLID[cpuThreadID]) {
+         if (!gpu_try_memset_async(returnLID[cpuThreadID], 0, 4*sizeof(vmesh::LocalID), stream)) {
+            printf("[GPU-DBG] skip/failed memset returnLID: %p\n", (void*)returnLID[cpuThreadID]);
+         }
+      } else {
+         // fprintf(stderr, "[HOST-DBG] adjust_caller: returnLID array/slot is null (thread=%u)\n", cpuThreadID);
+         fflush(stderr);
+      }
+      if (returnRealf && returnRealf[cpuThreadID]) {
+         if (!gpu_try_memset_async(returnRealf[cpuThreadID], 0, sizeof(Realf), stream)) {
+            printf("[GPU-DBG] skip/failed memset returnRealf: %p\n", (void*)returnRealf[cpuThreadID]);
+         }
+      } else {
+         // fprintf(stderr, "[HOST-DBG] adjust_caller: returnRealf array/slot is null (thread=%u)\n", cpuThreadID);
+         fflush(stderr);
+      }
+   // fprintf(stderr, "[HOST-DBG] adjust_caller: after memset checks (thread=%u)\n", cpuThreadID);
+      fflush(stderr);
+
+      // Fallback: allocate temporary device buffers if per-thread buffers are not usable
+      vmesh::LocalID* dev_returnLID_ptr = (returnLID ? returnLID[cpuThreadID] : (vmesh::LocalID*)nullptr);
+      bool temp_returnLID_alloc = false;
+      if (!dev_returnLID_ptr || !gpu_can_memop(dev_returnLID_ptr)) {
+         printf("[GPU-DBG] allocating temp device buffer for returnLID (per-thread buffer unusable)\n");
+         CHK_ERR( gpuMalloc((void**)&dev_returnLID_ptr, 8*sizeof(vmesh::LocalID)) );
+         temp_returnLID_alloc = true;
+      }
+   // fprintf(stderr, "[HOST-DBG] adjust_caller: after temp returnLID alloc (thread=%u)\n", cpuThreadID);
+      fflush(stderr);
+   // Ensure SplitVectors are resident on device; use persistent device mirrors created at allocation
+   gpu_list_with_replace_new[cpuThreadID]->optimizeGPU(stream);
+   gpu_list_delete[cpuThreadID]->optimizeGPU(stream);
+   gpu_list_to_replace[cpuThreadID]->optimizeGPU(stream);
+   gpu_list_with_replace_old[cpuThreadID]->optimizeGPU(stream);
+      // Ensure device mirror headers exist (lazy create if missing)
+      if (!gpu_list_with_replace_new_dev[cpuThreadID])
+         gpu_list_with_replace_new_dev[cpuThreadID] = gpu_list_with_replace_new[cpuThreadID]->upload();
+      if (!gpu_list_delete_dev[cpuThreadID])
+         gpu_list_delete_dev[cpuThreadID] = gpu_list_delete[cpuThreadID]->upload();
+      if (!gpu_list_to_replace_dev[cpuThreadID])
+         gpu_list_to_replace_dev[cpuThreadID] = gpu_list_to_replace[cpuThreadID]->upload();
+      if (!gpu_list_with_replace_old_dev[cpuThreadID])
+         gpu_list_with_replace_old_dev[cpuThreadID] = gpu_list_with_replace_old[cpuThreadID]->upload();
+      Realf* dev_returnRealf_ptr = (returnRealf ? returnRealf[cpuThreadID] : (Realf*)nullptr);
+      bool temp_returnRealf_alloc = false;
+      if (!dev_returnRealf_ptr || !gpu_can_memop(dev_returnRealf_ptr)) {
+         printf("[GPU-DBG] allocating temp device buffer for returnRealf (per-thread buffer unusable)\n");
+         CHK_ERR( gpuMalloc((void**)&dev_returnRealf_ptr, sizeof(Realf)) );
+         temp_returnRealf_alloc = true;
+      }
+   // fprintf(stderr, "[HOST-DBG] adjust_caller: after temp returnRealf alloc (thread=%u)\n", cpuThreadID);
+      fflush(stderr);
+      #ifdef DEBUG_SPATIAL_CELL
+      gpu_debug_pointer(populations[popID].dev_vmesh, "dev_vmesh");
+      gpu_debug_pointer(populations[popID].dev_blockContainer, "dev_blockContainer");
+      gpu_debug_pointer(gpu_list_with_replace_new[cpuThreadID], "list_with_replace_new(dev)");
+      gpu_debug_pointer(gpu_list_delete[cpuThreadID], "list_delete(dev)");
+      gpu_debug_pointer(gpu_list_to_replace[cpuThreadID], "list_to_replace(dev)");
+      gpu_debug_pointer(gpu_list_with_replace_old[cpuThreadID], "list_with_replace_old(dev)");
+      gpu_debug_pointer(returnLID[cpuThreadID], "returnLID(dev)");
+      gpu_debug_pointer(returnRealf[cpuThreadID], "returnRealf(dev)");
+      if (!gpu_list_with_replace_new[cpuThreadID] || !gpu_list_delete[cpuThreadID] || !gpu_list_to_replace[cpuThreadID] || !gpu_list_with_replace_old[cpuThreadID]) {
+         printf("[GPU-DBG] One or more adjustment lists are null (thread %u)\n", cpuThreadID);
+      } else {
+         printf("[GPU-DBG] sizes: add=%u del=%u rep=%u old=%u\n",
+                (unsigned)gpu_list_with_replace_new[cpuThreadID]->size(),
+                (unsigned)gpu_list_delete[cpuThreadID]->size(),
+                (unsigned)gpu_list_to_replace[cpuThreadID]->size(),
+                (unsigned)gpu_list_with_replace_old[cpuThreadID]->size());
+         printf("[GPU-DBG] caps: add=%u del=%u rep=%u old=%u\n",
+                (unsigned)gpu_list_with_replace_new[cpuThreadID]->capacity(),
+                (unsigned)gpu_list_delete[cpuThreadID]->capacity(),
+                (unsigned)gpu_list_to_replace[cpuThreadID]->capacity(),
+                (unsigned)gpu_list_with_replace_old[cpuThreadID]->capacity());
+      }
+      #endif
       // populations[popID].vmesh->print();
       // Grow the vmesh and block container, if necessary. Try performing this on-device, if possible.
       phiprof::Timer preparationTimer {"GPU resize mesh on-device"};
       resize_vbc_kernel_pre<<<1, 1, 0, stream>>> (
          populations[popID].dev_vmesh,
          populations[popID].dev_blockContainer,
-         gpu_list_with_replace_new[cpuThreadID],
-         gpu_list_delete[cpuThreadID],
-         gpu_list_to_replace[cpuThreadID],
-         gpu_list_with_replace_old[cpuThreadID],
-         returnLID[cpuThreadID], // return values: nbefore, nafter, nblockstochange, resize success
-         returnRealf[cpuThreadID] // mass loss, set to zero
+         gpu_list_with_replace_new_dev[cpuThreadID],
+         gpu_list_delete_dev[cpuThreadID],
+         gpu_list_to_replace_dev[cpuThreadID],
+         gpu_list_with_replace_old_dev[cpuThreadID],
+         dev_returnLID_ptr, // return values: nbefore, nafter, nblockstochange, resize success
+         dev_returnRealf_ptr // mass loss, set to zero
          );
       CHK_ERR( gpuPeekAtLastError() );
-      CHK_ERR( gpuMemcpyAsync(&host_returnLID[0], returnLID[cpuThreadID], 4*sizeof(vmesh::LocalID), gpuMemcpyDeviceToHost, stream) );
+   // fprintf(stderr, "[HOST-DBG] adjust_caller: after launch resize_vbc_kernel_pre (thread=%u)\n", cpuThreadID);
+      fflush(stderr);
+      // Ensure the stream tasks have completed before a synchronous copy
       CHK_ERR( gpuStreamSynchronize(stream) );
+   // fprintf(stderr, "[HOST-DBG] adjust_caller: after sync resize_vbc_kernel_pre (thread=%u)\n", cpuThreadID);
+      fflush(stderr);
+   CHK_ERR( gpuMemcpy(&host_returnLID[0], dev_returnLID_ptr, 4*sizeof(vmesh::LocalID), gpuMemcpyDeviceToHost) );
+      // fprintf(stderr, "[HOST-DBG] adjust_caller: after D2H returnLID (thread=%u) nb=%u na=%u ntc=%u ok=%u\n",
+         // cpuThreadID,
+         // (unsigned)host_returnLID[0], (unsigned)host_returnLID[1], (unsigned)host_returnLID[2], (unsigned)host_returnLID[3]);
+      fflush(stderr);
       // Grow mesh if necessary and on-device resize did not work??
       const vmesh::LocalID nBlocksBeforeAdjust = host_returnLID[0];
       const vmesh::LocalID nBlocksAfterAdjust = host_returnLID[1];
@@ -1109,6 +1309,8 @@ namespace spatial_cell {
          populations[popID].blockContainer->setNewSize(nBlocksAfterAdjust);
          populations[popID].Upload();
       }
+   // fprintf(stderr, "[HOST-DBG] adjust_caller: after possible host resize (thread=%u)\n", cpuThreadID);
+      fflush(stderr);
 
       if (nBlocksToChange==0) {
          // Update vmesh cached size
@@ -1130,17 +1332,32 @@ namespace spatial_cell {
       update_velocity_blocks_kernel<<<launchBlocks, vlasiBlocksPerWorkUnit * WID3, 0, stream>>> (
          populations[popID].dev_vmesh,
          populations[popID].dev_blockContainer,
-         gpu_list_with_replace_new[cpuThreadID],
-         gpu_list_delete[cpuThreadID],
-         gpu_list_to_replace[cpuThreadID],
-         gpu_list_with_replace_old[cpuThreadID],
+         gpu_list_with_replace_new_dev[cpuThreadID],
+         gpu_list_delete_dev[cpuThreadID],
+         gpu_list_to_replace_dev[cpuThreadID],
+         gpu_list_with_replace_old_dev[cpuThreadID],
          nBlocksBeforeAdjust,
          nBlocksToChange,
          nBlocksAfterAdjust,
-         returnRealf[cpuThreadID] // mass loss
+         dev_returnRealf_ptr // mass loss
          );
       CHK_ERR( gpuPeekAtLastError() );
-      CHK_ERR( gpuMemcpyAsync(&host_rhoLossAdjust, returnRealf[cpuThreadID], sizeof(Realf), gpuMemcpyDeviceToHost, stream) );
+   // fprintf(stderr, "[HOST-DBG] adjust_caller: after launch update_velocity_blocks_kernel (thread=%u, blocks=%u)\n", cpuThreadID, (unsigned)launchBlocks);
+      fflush(stderr);
+   CHK_ERR( gpuStreamSynchronize(stream) );
+   // fprintf(stderr, "[HOST-DBG] adjust_caller: after sync update_velocity_blocks_kernel (thread=%u)\n", cpuThreadID);
+      fflush(stderr);
+      CHK_ERR( gpuMemcpy(&host_rhoLossAdjust, dev_returnRealf_ptr, sizeof(Realf), gpuMemcpyDeviceToHost) );
+   // fprintf(stderr, "[HOST-DBG] adjust_caller: after D2H rhoLossAdjust (thread=%u)=%g\n", cpuThreadID, (double)host_rhoLossAdjust);
+      fflush(stderr);
+
+      // Free temporary buffers if we allocated them
+      if (temp_returnLID_alloc) {
+         CHK_ERR( gpuFree(dev_returnLID_ptr) );
+      }
+      if (temp_returnRealf_alloc) {
+         CHK_ERR( gpuFree(dev_returnRealf_ptr) );
+      }
 
       // Shrink the vmesh and block container, if necessary
       if (nBlocksAfterAdjust < nBlocksBeforeAdjust) {
@@ -1152,12 +1369,16 @@ namespace spatial_cell {
             );
          CHK_ERR( gpuPeekAtLastError() );
       }
+   // fprintf(stderr, "[HOST-DBG] adjust_caller: after possible post-resize (thread=%u)\n", cpuThreadID);
+      fflush(stderr);
       // Update vmesh cached size
       populations[popID].vmesh->setNewCachedSize(nBlocksAfterAdjust);
 
       CHK_ERR( gpuStreamSynchronize(stream) );
       this->populations[popID].RHOLOSSADJUST += host_rhoLossAdjust;
       addRemoveKernelTimer.stop();
+   // fprintf(stderr, "[HOST-DBG] adjust_caller: end ok (thread=%u), nAfter=%u\n", cpuThreadID, (unsigned)nBlocksAfterAdjust);
+   fflush(stderr);
 
       // DEBUG output after kernel
       #ifdef DEBUG_SPATIAL_CELL

@@ -298,15 +298,20 @@ int main(int argn,char* args[]) {
       }
       exit(1);
    }
+ 
    if (myRank == MASTER_RANK) {
-      const char* mpiioenv = std::getenv("OMPI_MCA_io");
-      if(mpiioenv != nullptr) {
+     const char* mpiioenv = std::getenv("OMPI_MCA_io");
+     if (mpiioenv) {  // only construct string if it's not null
          std::string mpiioenvstr(mpiioenv);
-         if(mpiioenvstr.find("^ompio") == std::string::npos) {
-            cout << mpiioMessage.str();
+         if (mpiioenvstr.find("^ompio") == std::string::npos) {
+             std::cout << mpiioMessage.str();
          }
-      }
-   }
+     } else {
+         // environment variable not set, you can optionally print something
+         std::cout << "OMPI_MCA_io not set, using default MPI IO.\n";
+     }
+ }
+
 
    phiprof::initialize();
 

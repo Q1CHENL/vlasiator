@@ -29,6 +29,7 @@
 #include <iomanip> // for setprecision()
 #include <cmath>
 #include <sstream>
+#include <cstdio>
 #include <ctime>
 #include <cstring>
 #include <array>
@@ -426,7 +427,11 @@ bool writeDataReducer(const dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geometry>&
          phiprof::Timer writeArrayTimer {"writeArray"};
          if (vlsvWriter.writeArray("VARIABLE", attribs, dataType_smaller, arraySize_smaller, vectorSize_smaller, dataSize_smaller, varBuffer_smaller_char) == false) {
             success = false;
-            logFile << "(MAIN) writeGrid: ERROR failed to write datareductionoperator data to file!" << endl << writeVerbose;
+            logFile << "(MAIN) writeGrid: ERROR failed to write DRO '" << variableName << "' to file!" << endl << writeVerbose;
+            int dbgRank=-1; MPI_Comm_rank(MPI_COMM_WORLD,&dbgRank);
+            fprintf(stderr,"[IO-ERR] writeDataReducer: writeArray failed for '%s' (rank=%d,size=%u,vec=%u,type=float32)\n",
+                    variableName.c_str(), dbgRank, arraySize_smaller, vectorSize_smaller);
+            fflush(stderr);
          }
          writeArrayTimer.stop();
          delete[] varBuffer_smaller;
@@ -436,7 +441,11 @@ bool writeDataReducer(const dccrg::Dccrg<SpatialCell,dccrg::Cartesian_Geometry>&
          phiprof::Timer writeArrayTimer {"writeArray"};
          if (vlsvWriter.writeArray("VARIABLE",attribs, dataType, cells.size(), vectorSize, dataSize, varBuffer) == false) {
             success = false;
-            logFile << "(MAIN) writeGrid: ERROR failed to write datareductionoperator data to file!" << endl << writeVerbose;
+            logFile << "(MAIN) writeGrid: ERROR failed to write DRO '" << variableName << "' to file!" << endl << writeVerbose;
+            int dbgRank=-1; MPI_Comm_rank(MPI_COMM_WORLD,&dbgRank);
+            fprintf(stderr,"[IO-ERR] writeDataReducer: writeArray failed for '%s' (rank=%d,size=%zu,vec=%u,type=%s)\n",
+                    variableName.c_str(), dbgRank, cells.size(), vectorSize, dataType.c_str());
+            fflush(stderr);
          }
       }
    }
@@ -480,28 +489,32 @@ bool writeCommonGridData(
    xmlAttributes["name"] = "CellID";
    xmlAttributes["mesh"] = "SpatialGrid";
    if( vlsvWriter.writeArray( "VARIABLE", xmlAttributes, arraySize, vectorSize, local_cells.data() ) == false ) {
+      int dbgRank=-1; MPI_Comm_rank(comm,&dbgRank);
+      fprintf(stderr,"[IO-ERR] writeCommonGridData: writeArray CellID failed (rank=%d, count=%u)\n", dbgRank, arraySize);
+      fflush(stderr);
       return false;
    }
 
    //Write parameters:
-   if( vlsvWriter.writeParameter("time", &P::t) == false ) { return false; }
-   if( vlsvWriter.writeParameter("dt", &P::dt) == false ) { return false; }
-   if( vlsvWriter.writeParameter("timestep", &P::tstep) == false ) { return false; }
-   if( vlsvWriter.writeParameter("fieldSolverSubcycles", &P::fieldSolverSubcycles) == false ) { return false; }
-   if( vlsvWriter.writeParameter("fileIndex", &fileIndex) == false ) { return false; }
-   if( vlsvWriter.writeParameter("xmin", &P::xmin) == false ) { return false; }
-   if( vlsvWriter.writeParameter("xmax", &P::xmax) == false ) { return false; }
-   if( vlsvWriter.writeParameter("ymin", &P::ymin) == false ) { return false; }
-   if( vlsvWriter.writeParameter("ymax", &P::ymax) == false ) { return false; }
-   if( vlsvWriter.writeParameter("zmin", &P::zmin) == false ) { return false; }
-   if( vlsvWriter.writeParameter("zmax", &P::zmax) == false ) { return false; }
-   if( vlsvWriter.writeParameter("xcells_ini", &P::xcells_ini) == false ) { return false; }
-   if( vlsvWriter.writeParameter("ycells_ini", &P::ycells_ini) == false ) { return false; }
-   if( vlsvWriter.writeParameter("zcells_ini", &P::zcells_ini) == false ) { return false; }
+   if( vlsvWriter.writeParameter("time", &P::t) == false ) { fprintf(stderr,"[IO-ERR] writeCommonGridData: writeParameter time failed\n"); fflush(stderr); return false; }
+   if( vlsvWriter.writeParameter("dt", &P::dt) == false ) { fprintf(stderr,"[IO-ERR] writeCommonGridData: writeParameter dt failed\n"); fflush(stderr); return false; }
+   if( vlsvWriter.writeParameter("timestep", &P::tstep) == false ) { fprintf(stderr,"[IO-ERR] writeCommonGridData: writeParameter timestep failed\n"); fflush(stderr); return false; }
+   if( vlsvWriter.writeParameter("fieldSolverSubcycles", &P::fieldSolverSubcycles) == false ) { fprintf(stderr,"[IO-ERR] writeCommonGridData: writeParameter fieldSolverSubcycles failed\n"); fflush(stderr); return false; }
+   if( vlsvWriter.writeParameter("fileIndex", &fileIndex) == false ) { fprintf(stderr,"[IO-ERR] writeCommonGridData: writeParameter fileIndex failed\n"); fflush(stderr); return false; }
+   if( vlsvWriter.writeParameter("xmin", &P::xmin) == false ) { fprintf(stderr,"[IO-ERR] writeCommonGridData: writeParameter xmin failed\n"); fflush(stderr); return false; }
+   if( vlsvWriter.writeParameter("xmax", &P::xmax) == false ) { fprintf(stderr,"[IO-ERR] writeCommonGridData: writeParameter xmax failed\n"); fflush(stderr); return false; }
+   if( vlsvWriter.writeParameter("ymin", &P::ymin) == false ) { fprintf(stderr,"[IO-ERR] writeCommonGridData: writeParameter ymin failed\n"); fflush(stderr); return false; }
+   if( vlsvWriter.writeParameter("ymax", &P::ymax) == false ) { fprintf(stderr,"[IO-ERR] writeCommonGridData: writeParameter ymax failed\n"); fflush(stderr); return false; }
+   if( vlsvWriter.writeParameter("zmin", &P::zmin) == false ) { fprintf(stderr,"[IO-ERR] writeCommonGridData: writeParameter zmin failed\n"); fflush(stderr); return false; }
+   if( vlsvWriter.writeParameter("zmax", &P::zmax) == false ) { fprintf(stderr,"[IO-ERR] writeCommonGridData: writeParameter zmax failed\n"); fflush(stderr); return false; }
+   if( vlsvWriter.writeParameter("xcells_ini", &P::xcells_ini) == false ) { fprintf(stderr,"[IO-ERR] writeCommonGridData: writeParameter xcells_ini failed\n"); fflush(stderr); return false; }
+   if( vlsvWriter.writeParameter("ycells_ini", &P::ycells_ini) == false ) { fprintf(stderr,"[IO-ERR] writeCommonGridData: writeParameter ycells_ini failed\n"); fflush(stderr); return false; }
+   if( vlsvWriter.writeParameter("zcells_ini", &P::zcells_ini) == false ) { fprintf(stderr,"[IO-ERR] writeCommonGridData: writeParameter zcells_ini failed\n"); fflush(stderr); return false; }
    const int writewid = WID;
-   if( vlsvWriter.writeParameter("velocity_block_width", &writewid) == false ) { return false; }
+   if( vlsvWriter.writeParameter("velocity_block_width", &writewid) == false ) { fprintf(stderr,"[IO-ERR] writeCommonGridData: writeParameter velocity_block_width failed\n"); fflush(stderr); return false; }
    if( FieldTracing::fieldTracingParameters.doTraceFullBox ) {
       if( vlsvWriter.writeParameter("fieldTracingFluxRopeMaxDistance", &FieldTracing::fieldTracingParameters.fluxrope_max_curvature_radii_to_trace ) == false ) {
+         fprintf(stderr,"[IO-ERR] writeCommonGridData: writeParameter fieldTracingFluxRopeMaxDistance failed\n"); fflush(stderr);
          return false;
       }
    }
@@ -1353,6 +1366,7 @@ bool writeGrid(
          MPI_Info_set(MPIinfo, it->first.c_str(), it->second.c_str());
       }
    }
+   P::systemWriteHints.clear();
    if (stripe < -1){
       cerr << "Error: trying to set an invalid lustre stripe count in bulk IO. Ignoring value." << endl;
    } else {
@@ -1367,7 +1381,18 @@ bool writeGrid(
    }
 
    phiprof::Timer openTimer {"open"};
-   vlsvWriter.open( fname.str(), MPI_COMM_WORLD, masterProcessId, MPIinfo );
+   // Debug: print target filename and stripe before opening
+   {
+      int dbgRank=-1; MPI_Comm_rank(MPI_COMM_WORLD,&dbgRank);
+      fprintf(stderr,"[IO-DBG] writeGrid: rank=%d opening '%s' (stripe=%d)\n", dbgRank, fname.str().c_str(), stripe);
+      fflush(stderr);
+   }
+   if (vlsvWriter.open( fname.str(), MPI_COMM_WORLD, masterProcessId, MPIinfo ) == false) {
+      int dbgRank=-1; MPI_Comm_rank(MPI_COMM_WORLD,&dbgRank);
+      fprintf(stderr,"[IO-ERR] writeGrid: open failed for '%s' (rank=%d)\n", fname.str().c_str(), dbgRank);
+      fflush(stderr);
+      return false;
+   }
    openTimer.stop();
    
    if( MPIinfo != MPI_INFO_NULL ) {
@@ -1403,62 +1428,98 @@ bool writeGrid(
    //Write mesh boundaries: NOTE: master process only
    //Visit plugin needs to know the boundaries of the mesh so the number of cells in x, y, z direction
    if( writeMeshBoundingBox( vlsvWriter, meshName, masterProcessId, MPI_COMM_WORLD ) == false ) {
+      int dbgRank=-1; MPI_Comm_rank(MPI_COMM_WORLD,&dbgRank);
+      fprintf(stderr,"[IO-ERR] writeGrid: writeMeshBoundingBox failed (rank=%d)\n", dbgRank);
+      fflush(stderr);
       return false;
    }
 
    //Write the node coordinates: NOTE: master process only
    if( writeBoundingBoxNodeCoordinates( vlsvWriter, meshName, masterProcessId, MPI_COMM_WORLD ) == false ) {
+      int dbgRank=-1; MPI_Comm_rank(MPI_COMM_WORLD,&dbgRank);
+      fprintf(stderr,"[IO-ERR] writeGrid: writeBoundingBoxNodeCoordinates failed (rank=%d)\n", dbgRank);
+      fflush(stderr);
       return false;
    }
 
    //Write basic grid variables: NOTE: master process only
    if( writeCommonGridData(vlsvWriter, mpiGrid, local_cells, P::systemWrites[outputFileTypeIndex], MPI_COMM_WORLD) == false ) {
+      int dbgRank=-1; MPI_Comm_rank(MPI_COMM_WORLD,&dbgRank);
+      fprintf(stderr,"[IO-ERR] writeGrid: writeCommonGridData failed (rank=%d)\n", dbgRank);
+      fflush(stderr);
       return false;
    }
 
    //Write zone global id numbers:
    if( writeZoneGlobalIdNumbers( mpiGrid, vlsvWriter, meshName, local_cells, ghost_cells ) == false ) {
+      int dbgRank=-1; MPI_Comm_rank(MPI_COMM_WORLD,&dbgRank);
+      fprintf(stderr,"[IO-ERR] writeGrid: writeZoneGlobalIdNumbers failed (rank=%d)\n", dbgRank);
+      fflush(stderr);
       return false;
    }
 
    //Write domain sizes:
    if( writeDomainSizes( vlsvWriter, meshName, local_cells.size(), ghost_cells.size() ) == false ) {
+      int dbgRank=-1; MPI_Comm_rank(MPI_COMM_WORLD,&dbgRank);
+      fprintf(stderr,"[IO-ERR] writeGrid: writeDomainSizes failed (rank=%d) locals=%zu ghosts=%zu\n", dbgRank, local_cells.size(), ghost_cells.size());
+      fflush(stderr);
       return false;
    }
 
    //Update local ids for cells:
    if( updateLocalIds( mpiGrid, local_cells, MPI_COMM_WORLD ) == false ) {
+      int dbgRank=-1; MPI_Comm_rank(MPI_COMM_WORLD,&dbgRank);
+      fprintf(stderr,"[IO-ERR] writeGrid: updateLocalIds failed (rank=%d)\n", dbgRank);
+      fflush(stderr);
       return false;
    }
 
    //Write ghost zone domain and local id numbers ( VisIt plugin needs this for MPI )
    if( writeGhostZoneDomainAndLocalIdNumbers( mpiGrid, vlsvWriter, meshName, ghost_cells ) == false ) {
+      int dbgRank=-1; MPI_Comm_rank(MPI_COMM_WORLD,&dbgRank);
+      fprintf(stderr,"[IO-ERR] writeGrid: writeGhostZoneDomainAndLocalIdNumbers failed (rank=%d)\n", dbgRank);
+      fflush(stderr);
       return false;
    }
 
    //Write FSGrid metadata
    if( writeFsGridMetadata( technicalGrid, vlsvWriter, P::systemWriteFsGrid.at(outputFileTypeIndex) ) == false ) {
+      int dbgRank=-1; MPI_Comm_rank(MPI_COMM_WORLD,&dbgRank);
+      fprintf(stderr,"[IO-ERR] writeGrid: writeFsGridMetadata failed (rank=%d)\n", dbgRank);
+      fflush(stderr);
       return false;
    }
 
    //Write Ionosphere Grid
    if( writeIonosphereGridMetadata( vlsvWriter ) == false ) {
+      int dbgRank=-1; MPI_Comm_rank(MPI_COMM_WORLD,&dbgRank);
+      fprintf(stderr,"[IO-ERR] writeGrid: writeIonosphereGridMetadata failed (rank=%d)\n", dbgRank);
+      fflush(stderr);
       return false;
    }
    
    //Write Version Info 
    if( writeVersionInfo(versionInfo,vlsvWriter,MPI_COMM_WORLD) == false ) {
+      int dbgRank=-1; MPI_Comm_rank(MPI_COMM_WORLD,&dbgRank);
+      fprintf(stderr,"[IO-ERR] writeGrid: writeVersionInfo failed (rank=%d)\n", dbgRank);
+      fflush(stderr);
       return false;
    }
       
    //Write Config Info 
    if( writeConfigInfo(configInfo,vlsvWriter,MPI_COMM_WORLD) == false ) {
+      int dbgRank=-1; MPI_Comm_rank(MPI_COMM_WORLD,&dbgRank);
+      fprintf(stderr,"[IO-ERR] writeGrid: writeConfigInfo failed (rank=%d)\n", dbgRank);
+      fflush(stderr);
       return false;
    }
    
    metadataTimer.stop();
    phiprof::Timer vspaceTimer {"velocityspaceIO"};
    if(writeVelocitySpace( mpiGrid, vlsvWriter, outputFileTypeIndex, local_cells ) == false)  {
+      int dbgRank=-1; MPI_Comm_rank(MPI_COMM_WORLD,&dbgRank);
+      fprintf(stderr,"[IO-ERR] writeGrid: writeVelocitySpace failed (rank=%d)\n", dbgRank);
+      fflush(stderr);
       return false;
    }
    vspaceTimer.stop();
@@ -1597,7 +1658,8 @@ bool writeRestart(
       char factor[] = "striping_factor";
       MPI_Info_set(MPIinfo, factor, stripeChar);
    }
-   
+   P::systemWriteHints.clear();
+
    if( vlsvWriter.open( fname.str(), MPI_COMM_WORLD, masterProcessId, MPIinfo ) == false) return false;
 
    if( MPIinfo != MPI_INFO_NULL ) {
