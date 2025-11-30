@@ -540,6 +540,16 @@ ARCH_HOSTDEV inline void compute_filtered_face_values_nonuniform_conserving(cons
 
 ARCH_DEV inline void compute_h8_left_face_value(const Vec * const values, uint k, Realf &fv_l, const int index)
 {
+
+// DPF is not enabled
+// 9.0 is double, 9.0f is float
+// Each computation step: a float->double conversion
+// Assignment: a double->float conversion
+// I think it is absolute safe to mark these double literals using f suffix
+// No matter how big values[x][y] can be and no matter DPF is enabled or not
+// Because these literals are small and can be exactly represented by float
+// Then conversion will happen with DPF enabled, will not happen with DPF disabled
+// values[x][y] is either float or double depending on DPF
    fv_l = 1.0/840.0 * (
               - 3.0 * values[k - 4][index]
               + 29.0 * values[k - 3][index]
@@ -674,6 +684,13 @@ ARCH_DEV inline void compute_filtered_face_values_derivatives(const Vec * const 
    if(filter)
    {
       //Go to linear (PLM) estimates if not ok (this is always ok!)
+      // slope_sign is Realf
+      // 0.5 is double, 0.5f is float
+      // slope_abs is Realf
+      // fv_l is Realf
+      // * is conversion from float to double
+      // Assignment: a double->float conversion
+      // Here should be also absolutely safe to mark 0.5 using f suffix
       fv_l= (filter) ? values[k ][index] - slope_sign * 0.5 * slope_abs : fv_l;
       fd_l= (filter) ? slope_sign * slope_abs : fd_l;
    }
@@ -682,6 +699,12 @@ ARCH_DEV inline void compute_filtered_face_values_derivatives(const Vec * const 
    if(filter)
    {
       //Go to linear (PLM) estimates if not ok (this is always ok!)
+      // slope_sign is Realf
+      // fv_r is Realf
+      // 0.5 is double, 0.5f is float
+      // * is conversion from float to double
+      // Assignment: a double->float conversion
+      // Here should be also absolutely safe to mark 0.5 using f suffix
       fv_r= (filter) ? values[k][index] + slope_sign * 0.5 * slope_abs : fv_r;
       fd_r= (filter) ? slope_sign * slope_abs : fd_r;
    }

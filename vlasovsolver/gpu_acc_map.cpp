@@ -423,6 +423,7 @@ __global__ void __launch_bounds__(VECL,4) acceleration_kernel(
    const uint column = blocki;
    {
       /* New threading with each warp/wavefront working on one vector */
+      // Conversion from int to Realv is inevitable
       Realf v_r0 = ( (WID * gpu_columns[column].kBegin) * dv + v_min);
 
       // i,j,k are relative to the order in which we copied data to the values array.
@@ -441,6 +442,13 @@ __global__ void __launch_bounds__(VECL,4) acceleration_kernel(
          int target_cell_index_common =
             i_indices * gpu_cell_indices_to_id[0] +
             j_indices * gpu_cell_indices_to_id[1];
+
+         // Integer to Realv (float or double) conversion
+         // gpu_columns[column].i is int
+         // WID and VECL are defined as number literals
+         // i_indices is uint
+         // Here a conversion from int to Realv is inevitable, will be done by the compiler
+         // Just that an explicit conversion is no needed in code
          const Realf intersection_min =
             intersection +
             (gpu_columns[column].i * WID + (Realv)i_indices) * intersection_di +
