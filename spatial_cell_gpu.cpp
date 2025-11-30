@@ -29,6 +29,12 @@
 
 using namespace std;
 
+#ifdef GPU_ANALYSIS_BUILD
+namespace vmesh {
+__device__ __constant__ MeshWrapper* meshWrapperDevInstance;
+}
+#endif
+
 // GPUTODO: Make error-checking functions to be called inside kernels instead of duplicating so much code.
 // Same for gathering mass loss.
 

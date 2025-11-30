@@ -42,6 +42,7 @@
 // One per particle population
 #define MAX_VMESH_PARAMETERS_COUNT 32
 
+#pragma once
 namespace vmesh {
 
    /** Wrapper for mesh parameters. The object wrapper reads one or more velocity meshes
@@ -104,7 +105,13 @@ namespace vmesh {
    // This means that each compilation unit will use its own. To make sure all instances are initialized with the same
    // address, we use the Ctor of a static object to register all intances so that the allocated memory pointer
    // could be copied to all of them.
-   __device__ __constant__ MeshWrapper* meshWrapperDevInstance;
+   #ifdef GPU_ANALYSIS_BUILD
+   // For relocatable (RDC) analysis build: declare only.
+   extern __device__ __constant__ vmesh::MeshWrapper* meshWrapperDevInstance;
+   #else
+   // For normal non-RDC build: define per translation unit.
+   __device__ __constant__ vmesh::MeshWrapper* meshWrapperDevInstance;
+   #endif
    ARCH_DEV static MeshWrapper* gpu_getMeshWrapper() { return meshWrapperDevInstance; };
    // Static object and corresponding instance whose Ctor is used register all the instances of device meshWrapperDev
    // symbols.
