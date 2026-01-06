@@ -47,7 +47,7 @@ static const double BLOCK_ALLOCATION_FACTOR = 1.2;
 static const int TRANSLATION_BUFFER_ALLOCATION_FACTOR = 5;
 
 #define DIMS 1
-#define MAXCPUTHREADS 64
+#define MAXCPUTHREADS 256
 
 void gpu_init_device();
 void gpu_clear_device();
