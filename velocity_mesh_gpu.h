@@ -439,7 +439,13 @@ namespace vmesh {
          assert (0 && "ERROR invalid local id");
       }
       #endif
-
+      // [Use Restrict]
+      // Not really a Use Restrict chance
+      // localID is the sole parameter
+      // And LDG.E is already used
+      // [Use Texture]
+      // I think not
+      // LDG.E.64 R26, desc[UR36][R2.64+0x18];
       return localToGlobalMap->at(localID);
    }
 
@@ -469,6 +475,7 @@ namespace vmesh {
          * (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[0];
    }
 
+   // no meaningful warp divergence
    ARCH_HOSTDEV inline vmesh::GlobalID VelocityMesh::getGlobalID(const vmesh::LocalID& i,const vmesh::LocalID& j,const vmesh::LocalID& k) const {
       if (i >= (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[0]) return invalidGlobalID();
       if (j >= (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[1]) return invalidGlobalID();
@@ -487,9 +494,12 @@ namespace vmesh {
    }
 
    ARCH_HOSTDEV inline void VelocityMesh::getIndices(const vmesh::GlobalID& globalID,vmesh::LocalID& i,vmesh::LocalID& j,vmesh::LocalID& k) const {
+      // a real conditional branch
+      // but not a meaningful warp divergence
       if (globalID >= invalidGlobalID()) {
          i = j = k = invalidBlockIndex();
       } else {
+         // Data conversion F2I
          i = globalID % (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[0];
          j = (globalID / (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[0]) % (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[1];
          k = globalID / ((*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[0] * (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[1]);
@@ -807,6 +817,8 @@ namespace vmesh {
    }
    ARCH_DEV inline vmesh::LocalID VelocityMesh::warpGetLocalID(const vmesh::GlobalID& globalID, const size_t b_tid) const {
       vmesh::LocalID retval = invalidLocalID();
+      // Is already using LDG (ready-only cached global load) which uses the texture/L1 read-only data cache path instead of the normal global load path.
+      // also not meaningful restrict usage, which is usually raw pointers passed in as parameters.
       globalToLocalMap->warpFind(globalID, retval, b_tid % GPUTHREADS);
       #ifdef DEBUG_VMESH
       auto it = globalToLocalMap->device_find(globalID);
@@ -920,6 +932,7 @@ namespace vmesh {
          return blockGID;
       }
    }
+   // No true warp divergence here: all uniform, only b_tid==0 is intentional
    ARCH_DEV inline bool VelocityMesh::warpPush_back(const vmesh::GlobalID& globalID, const size_t b_tid) {
       const vmesh::LocalID mySize = size();
       if (mySize >= (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].max_velocity_blocks) return false;
@@ -935,6 +948,9 @@ namespace vmesh {
       __syncthreads();
       if (b_tid < GPUTHREADS) {
          // If exists, do not overwrite
+         // [Use Restrict for R20]
+         // LDG.E.64 R20, desc[UR36][R38.64];
+         // inserted is a local variable
          inserted = globalToLocalMap->warpInsert_V<true>(globalID,(vmesh::LocalID)mySize, b_tid);
          if (inserted == true && b_tid==0) {
             localToGlobalMap->device_push_back(globalID);
@@ -1272,6 +1288,7 @@ namespace vmesh {
       const int currentSizePower = globalToLocalMap->getSizePower();
       const int newSize2 = newSize > 0 ? newSize : 1;
       assert(ceil(log2(newSize2)) <= currentSizePower && "insufficient map capacity in vmesh::device_setNewSize");
+      // LDG is already in use, so no meaningful texture memory usage further needed.
       localToGlobalMap->device_resize(newSize,false); //construct=false don't construct or set to zero
       ltg_size = newSize; // Remember to update size on host as well
    }

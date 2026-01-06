@@ -68,6 +68,9 @@ __device__ void inline swapBlockIndices(vmesh::LocalID &blockIndices0,vmesh::Loc
 
 __global__ void __launch_bounds__(VECL,4) reorder_blocks_by_dimension_kernel(
    vmesh::VelocityBlockContainer *blockContainer,
+   // Can make it const __restrict__?
+   // But does not really help as it already using LDG.E
+   // And there is no second Vec pointer in the param list
    Vec *gpu_blockDataOrdered,
    uint *gpu_cell_indices_to_id,
    vmesh::LocalID *gpu_LIDlist,
@@ -131,7 +134,9 @@ __global__ void __launch_bounds__(VECL,4) reorder_blocks_by_dimension_kernel(
 // Serial kernel only to avoid page faults or prefetches
 __global__ void __launch_bounds__(1,4) count_columns_kernel (
    ColumnOffsets* gpu_columnData,
-   vmesh::LocalID* returnLID, // gpu_totalColumns, gpu_valuesSizeRequired
+   // Might be Use Restrict chances
+   // But LDG.E is already used
+   const __restrict__ vmesh::LocalID* returnLID, // gpu_totalColumns, gpu_valuesSizeRequired
    // Pass vectors for clearing
    split::SplitVector<vmesh::GlobalID> *list_with_replace_new,
    split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>* list_delete,
@@ -146,6 +151,7 @@ __global__ void __launch_bounds__(1,4) count_columns_kernel (
       for(uint setIndex=0; setIndex< gpu_columnData->setColumnOffsets.size(); ++setIndex) {
          returnLID[0] += gpu_columnData->setNumColumns[setIndex];
          for(uint columnIndex = gpu_columnData->setColumnOffsets[setIndex]; columnIndex < gpu_columnData->setColumnOffsets[setIndex] + gpu_columnData->setNumColumns[setIndex] ; columnIndex ++){
+            // Might beUse Restrict chance
             returnLID[1] += (gpu_columnData->columnNumBlocks[columnIndex] + 2) * WID3 / VECL;
          }
       }
@@ -402,7 +408,9 @@ __global__ void __launch_bounds__(VECL,4) acceleration_kernel(
    Vec *gpu_blockDataOrdered,
    uint *gpu_cell_indices_to_id,
    uint *gpu_block_indices_to_id,
-   Column *gpu_columns,
+   // TODO::UseRestrict here?
+   // Tho not recommanded by GPUscout
+   const __restrict__ Column *gpu_columns,
    uint totalColumns,
    Realv intersection,
    Realv intersection_di,
@@ -488,6 +496,8 @@ __global__ void __launch_bounds__(VECL,4) acceleration_kernel(
             const int minGk = max(lagrangian_gk_l, int(gpu_columns[column].minBlockK * WID));
             const int maxGk = min(lagrangian_gk_r, int((gpu_columns[column].maxBlockK + 1) * WID - 1));
             // Run along the column and perform the polynomial reconstruction
+            // 2.5% Branch divergence
+            // More of a noise
             for(int gk = minGk; gk <= maxGk; gk++) {
                const int blockK = gk/WID;
                const int gk_mod_WID = (gk - blockK * WID);

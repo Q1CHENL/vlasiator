@@ -193,6 +193,8 @@ static ARCH_DEV inline void filter_pqm_monotonicity(Vec *values, uint k, Realf &
     will make the root to be +-100 which is well outside range
     of[0,1]. We do not catch FP exceptions, so sqrt(negative) are okish (add
     a max(val_to_sqrt,0) if not*/
+   // e.g 2.5% Branch divergence
+   // Intentional, explained by the comments above
    const Realf val_to_sqrt = b1 * b1 - 4 * b0 * b2;
    const Realf sqrt_val = (val_to_sqrt < 0.0) ?
                                b1 + 200.0 * b2 :
@@ -231,6 +233,9 @@ static ARCH_DEV inline void filter_pqm_monotonicity(Vec *values, uint k, Realf &
       Realv slope_signa = slope_sign;
       //need to collapse, point has wrong sign
 
+      // These are also intentional branch divergences
+      // PQM monotonicity / collapse logic: collapse to left vs right edge 
+      // then consistency check
       if(fabs(plm_slope_l) <= fabs(plm_slope_r))
       {
          //collapse to left edge (eq 21)

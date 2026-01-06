@@ -147,6 +147,10 @@ namespace spatial_cell {
       // Pointer to target block data
       Realf* data = blockContainer->getData(blockLID);
       // Scale value
+      // [Use Restrict]
+      // Might be a Use Restrict chance for data: put it in parameter list?
+      // Not a chance for Use Texture
+      // No spatial locality found for the data stored in this register.
       data[ti] = data[ti] * factor;
    }
    /** GPU kernel for adding a particle population to another with a scaling factor
@@ -163,6 +167,15 @@ namespace spatial_cell {
       // GPUTODO: This could gather into a vector GIDs and (invalidGIDs) of only those GIDs which need to be added
       // and call another kernel to do just that?
       ) {
+      
+      // #ifdef KERNEL_PRINT
+      static bool first_execution = true;
+      if (first_execution) {
+         first_execution = false;
+         printf("population increment kernel executed\n");
+      }
+      // #endif
+      
       //const int gpuBlocks = gridDim.x;
       //const int blocki = blockIdx.x;
       const int i = threadIdx.x;
@@ -175,6 +188,7 @@ namespace spatial_cell {
       //    }
       // }
       // for (vmesh::LocalID incLID=blocki; incLID<nBlocks; incLID += gpuBlocks) {
+      // No true warp divergence here: all uniform
       for (vmesh::LocalID incLID=0; incLID<nBlocks; incLID ++) {
          const Realf* fromData = otherBlockContainer->getData(incLID);
          // Global ID of the block containing incoming data
