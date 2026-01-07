@@ -136,7 +136,7 @@ __global__ void __launch_bounds__(1,4) count_columns_kernel (
    ColumnOffsets* gpu_columnData,
    // Might be Use Restrict chances
    // But LDG.E is already used
-   const __restrict__ vmesh::LocalID* returnLID, // gpu_totalColumns, gpu_valuesSizeRequired
+   vmesh::LocalID* returnLID, // gpu_totalColumns, gpu_valuesSizeRequired
    // Pass vectors for clearing
    split::SplitVector<vmesh::GlobalID> *list_with_replace_new,
    split::SplitVector<Hashinator::hash_pair<vmesh::GlobalID,vmesh::LocalID>>* list_delete,
@@ -410,7 +410,7 @@ __global__ void __launch_bounds__(VECL,4) acceleration_kernel(
    uint *gpu_block_indices_to_id,
    // TODO::UseRestrict here?
    // Tho not recommanded by GPUscout
-   const __restrict__ Column *gpu_columns,
+   const Column *gpu_columns,
    uint totalColumns,
    Realv intersection,
    Realv intersection_di,
