@@ -213,11 +213,15 @@ namespace spatial_cell {
             Realf* toData = blockContainer->getData(writeLID);
             if (created) {
                // Write values from source cells
+               // [Datatype Conversion F2F] [spatial_cell_gpu.cubin] 
+               // P0 F2F.F64.F32 R4, R0 (from F64 double to F32 float)
                toData[ti] = fromData[ti] * factor;
             }
          } else {
             // Increment with values from source cells
             Realf* toData = blockContainer->getData(toLID);
+            // [Datatype Conversion F2F] [spatial_cell_gpu.cubin]
+            // F64 <-> F32
             toData[ti] += fromData[ti] * factor;
          }
       } // for-loop over velocity blocks

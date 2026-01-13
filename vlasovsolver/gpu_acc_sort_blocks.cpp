@@ -81,7 +81,11 @@ __global__ void __launch_bounds__(GPUTHREADS,4) blocksID_mapped_dim1_kernel(
    const vmesh::LocalID LID = blocki * warpSize + ti;
    if (LID < nBlocks) {
       const vmesh::GlobalID GID = vmesh->getGlobalID(LID);
+      // [Datatype Conversion]
+      // I2F and F2I
       const vmesh::LocalID x_index = GID % D0;
+      // [Datatype Conversion]
+      // I2F and F2I
       const vmesh::LocalID y_index = (GID / D0) % D1;
       blocksID_mapped[LID] = GID - (x_index + y_index*D0) + y_index + x_index * D1;
       blocksLID_unsorted[LID]=LID;
@@ -103,8 +107,14 @@ __global__ void __launch_bounds__(GPUTHREADS,4) blocksID_mapped_dim2_kernel(
    const vmesh::LocalID LID = blocki * warpSize + ti;
    if (LID < nBlocks) {
       const vmesh::GlobalID GID = vmesh->getGlobalID(LID);
+      // [Datatype conversion]
+      // I2F and F2I
       const vmesh::LocalID x_index = GID % D0;
+      // [Datatype conversion]
+      // I2F and F2I
       const vmesh::LocalID y_index = (GID / D0) % D1;
+      // [Datatype conversion]
+      // I2F and F2I
       const vmesh::LocalID z_index = (GID / (D0*D1));
       blocksID_mapped[LID] = z_index + y_index*D2 + x_index*D1*D2;
       blocksLID_unsorted[LID]=LID;
@@ -129,24 +139,31 @@ __global__ void __launch_bounds__(GPUTHREADS,4) order_GIDs_kernel(
    const uint ti = threadIdx.z*blockDim.x*blockDim.y + threadIdx.y*blockDim.x + threadIdx.x;
 
    vmesh::LocalID DX;
+   // [Warp Divergence]
    switch (dimension) {
       case 0:
          DX = vmesh->getGridLength()[0];
          break;
       case 1:
          DX = vmesh->getGridLength()[1];
+         // [Warp Divergence]
          break;
       case 2:
          DX = vmesh->getGridLength()[2];
+         // [Warp Divergence]
          break;
       default:
+         // [Warp Divergence]
          printf("Incorrect dimension in __FILE__ __LINE__\n");
    }
 
    const vmesh::LocalID index = blocki * warpSize + ti;
+   // [Warp Divergence]
    if (index < nBlocks) {
       blocksGID[index] = vmesh->getGlobalID(blocksLID[index]);
 
+      // [Datatype Conversion]
+      // I2F and F2I
       const vmesh::LocalID column_id = blocksID_mapped_sorted[index] / DX;
       // Increment number of blocks in column
       const vmesh::LocalID old  = atomicAdd(&gpu_columnNBlocks[column_id],1);
@@ -184,12 +201,14 @@ __global__ void __launch_bounds__(GPUTHREADS,4) construct_columns_kernel(
    const uint warpSize = blockDim.x * blockDim.y * blockDim.z;
    //const int blocki = blockIdx.z*gridDim.x*gridDim.y + blockIdx.y*gridDim.x + blockIdx.x;
    const uint ti = threadIdx.z*blockDim.x*blockDim.y + threadIdx.y*blockDim.x + threadIdx.x;
+   // [Warp divergence]
    // intentional branch divergence
    if (gpuBlocks!=1) {
       printf("Error in construct_columns_kernel; unsafe gridDim\n");
       return;
    }
    vmesh::LocalID DX;
+   // [Warp Divergence]
    // warp-uniform
    switch (dimension) {
       case 0:
@@ -197,13 +216,16 @@ __global__ void __launch_bounds__(GPUTHREADS,4) construct_columns_kernel(
          break;
       case 1:
          DX = vmesh->getGridLength()[1];
+         // [Warp Divergence]
          // intentional branch divergence
          break;
       case 2:
          DX = vmesh->getGridLength()[2];
+         // [Warp Divergence]
          // intentional branch divergence
          break;
       default:
+         // [Warp Divergence]
          // intentional branch divergence
          printf("Incorrect dimension in __FILE__ __LINE__\n");
    }
@@ -211,6 +233,7 @@ __global__ void __launch_bounds__(GPUTHREADS,4) construct_columns_kernel(
 
    __shared__ vmesh::LocalID i;
    __shared__ vmesh::LocalID blocks_in_columnset;
+   // [Warp Divergence]
    // intentional branch divergence: leader thread
    if (ti==0) {
       i = 0;
@@ -222,6 +245,8 @@ __global__ void __launch_bounds__(GPUTHREADS,4) construct_columns_kernel(
    __syncthreads();
    while (i < nBlocks) {
       // identifies a particular column
+      // [Datatype conversion]
+      // F2I and I2F
       const vmesh::LocalID column_id = blocksID_mapped_sorted[i] / DX;
       // identifies a particular block in a column (along the dimension)
       const vmesh::LocalID dimension_id = blocksID_mapped_sorted[i] % DX;
@@ -232,6 +257,7 @@ __global__ void __launch_bounds__(GPUTHREADS,4) construct_columns_kernel(
       // Trial: new column?
       // intentional branch divergence
       // leader thread
+      // [Warp Divergence]
       if ( (ti==0) && (i > 0) &&  ( (column_id != prev_column_id) || (dimension_id != (prev_dimension_id + 1) ))) {
          //encountered new column! For i=0, we already entered the correct offset (0).
          //We also identify it as a new column if there is a break in the column (e.g., gap between two populations)
@@ -240,6 +266,7 @@ __global__ void __launch_bounds__(GPUTHREADS,4) construct_columns_kernel(
          //add length of the current column that now ended
          columnData->columnNumBlocks.device_push_back(columnData->columnBlockOffsets[columnData->columnBlockOffsets.size()-1] - columnData->columnBlockOffsets[columnData->columnBlockOffsets.size()-2]);
 
+         // [Warp Divergence]
          if (column_id != prev_column_id ){
             //encountered new set of columns, add offset to new set starting at present column
             columnData->setColumnOffsets.device_push_back(columnData->columnBlockOffsets.size() - 1);
@@ -249,9 +276,11 @@ __global__ void __launch_bounds__(GPUTHREADS,4) construct_columns_kernel(
       }
       __syncthreads();
       // Trial if only one column in columnset?
+      // [Warp Divergence]
       // warp-uniform
       // not dependent on ti
       if ( ( (blocksID_mapped_sorted[i+blocks_in_columnset-1] % DX) == (dimension_id + blocks_in_columnset - 1) ) &&
+      // [Warp Divergence]
            ( (blocksID_mapped_sorted[i+blocks_in_columnset-1] / DX) == column_id ) ) {
          // skip to end of column
          if (ti==0) {
@@ -264,11 +293,15 @@ __global__ void __launch_bounds__(GPUTHREADS,4) construct_columns_kernel(
          // More than one column in columnset
          vmesh::LocalID this_col_length = 0;
          // Now trial by warpSize to see where column ends
+         // [Warp Divergence]
          for (vmesh::LocalID ci=0; ci<blocks_in_columnset; ci += warpSize) {
             int notInColumn = 1;
             // intentional branch divergence
+            // [Warp Divergence]
             if (ci+ti < blocks_in_columnset) {
                // This evaluates if the block at the target point is no longer within the same column
+               // [Datatype conversion]
+               // I2F and F2I
                if ( (blocksID_mapped_sorted[i+ci+ti] % DX) == (dimension_id + ci+ti) &&
                     ( (blocksID_mapped_sorted[i+ci+ti] / DX) == column_id ) ) {
                   notInColumn = 0;
@@ -285,14 +318,17 @@ __global__ void __launch_bounds__(GPUTHREADS,4) construct_columns_kernel(
             }
             this_col_length += minstep;
             // Exit this for loop if we reached the end of a column within a set
+            // [Warp Divergence]
             // warp-uniform
             if (minstep!=warpSize) {
+               // [Warp Divergence]
                if (ti==0) {
                   // skip to end of column
                   i += this_col_length;
                   // Decrease number of free blocks in column(set)
                   blocks_in_columnset -= this_col_length;
                }
+               // [Warp Divergence]
                __syncthreads();
                // push_back to vectors happens at next loop
                break;
