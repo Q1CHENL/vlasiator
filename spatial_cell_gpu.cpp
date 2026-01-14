@@ -1041,6 +1041,7 @@ namespace spatial_cell {
             __device__(const Hashinator::hash_pair<vmesh::GlobalID, vmesh::LocalID>& kval) -> bool {
                                    const vmesh::LocalID nBlocksAfterAdjust2 = dev_vmesh->size()
                                       + d_list_add->size() - vbwncm->size();
+                                      // [Warp Divergence]
                                    return kval.first != EMPTYBUCKET &&
                                       kval.first != TOMBSTONE &&
                                       kval.first != invalidGID &&

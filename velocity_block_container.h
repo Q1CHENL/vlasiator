@@ -309,6 +309,7 @@ namespace vmesh {
       // for R24
       // LDG.E.64 R24, desc[UR36][R6.64];
       // No restrict needed here, just a pointer arithmetic
+      // [Use Texture]
       return block_data->data() + blockLID*WID3;
    }
 
@@ -397,6 +398,7 @@ namespace vmesh {
       #if defined(USE_GPU) && !defined(__CUDA_ARCH__) && !defined(__HIP_DEVICE_COMPILE__)
       gpuStream_t stream = gpu_getStream();
       #endif
+      // [Use Retrict]
       const vmesh::LocalID numberOfBlocks = block_data->size()/WID3;
 
       vmesh::LocalID newIndex = numberOfBlocks;
@@ -422,6 +424,7 @@ namespace vmesh {
 
       #if defined(USE_GPU) && (defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__))
       const vmesh::LocalID currentCapacityD = block_data->capacity()/WID3;
+      // [Warp Divergence]
       if (newIndex >= currentCapacityD) {
          assert(0 && "ERROR! Attempting to grow block container on-device beyond capacity (::push_back).");
       }

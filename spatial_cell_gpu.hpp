@@ -151,6 +151,8 @@ namespace spatial_cell {
       // Might be a Use Restrict chance for data: put it in parameter list?
       // Not a chance for Use Texture
       // No spatial locality found for the data stored in this register.
+      // [Datatype conversion]
+      // F2F
       data[ti] = data[ti] * factor;
    }
    /** GPU kernel for adding a particle population to another with a scaling factor
@@ -188,6 +190,7 @@ namespace spatial_cell {
       //    }
       // }
       // for (vmesh::LocalID incLID=blocki; incLID<nBlocks; incLID += gpuBlocks) {
+      // [Warp Divergence]
       // No true warp divergence here: all uniform
       for (vmesh::LocalID incLID=0; incLID<nBlocks; incLID ++) {
          const Realf* fromData = otherBlockContainer->getData(incLID);
@@ -200,6 +203,7 @@ namespace spatial_cell {
             bool created = vmesh->warpPush_back(GID, ti);
             // Thread zero must create new block
             if (ti==0) {
+               // [Warp Divergence]
                if (!created) {
                   assert(0 && "Error in incrementing blockContainer in population_increment_kernel!");
                }
@@ -211,16 +215,18 @@ namespace spatial_cell {
             }
             __syncthreads();
             Realf* toData = blockContainer->getData(writeLID);
+            // [Warp Divergence]
             if (created) {
                // Write values from source cells
-               // [Datatype Conversion F2F] [spatial_cell_gpu.cubin] 
+               // [Datatype Conversion] 
+               // [spatial_cell_gpu.cubin] 
                // P0 F2F.F64.F32 R4, R0 (from F64 double to F32 float)
                toData[ti] = fromData[ti] * factor;
             }
          } else {
             // Increment with values from source cells
             Realf* toData = blockContainer->getData(toLID);
-            // [Datatype Conversion F2F] [spatial_cell_gpu.cubin]
+            // [Datatype Conversion] [spatial_cell_gpu.cubin]
             // F64 <-> F32
             toData[ti] += fromData[ti] * factor;
          }

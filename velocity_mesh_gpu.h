@@ -402,6 +402,8 @@ namespace vmesh {
 
       // Indices 0-2 contain coordinates of the lower left corner.
       // The values are the same as if getBlockCoordinates(globalID,&(array[0])) was called
+      // [Datatype conversion]
+      // I2F and F2I
       array[0] = (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].meshMinLimits[0] + indices[0]*(*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].blockSize[0];
       array[1] = (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].meshMinLimits[1] + indices[1]*(*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].blockSize[1];
       array[2] = (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].meshMinLimits[2] + indices[2]*(*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].blockSize[2];
@@ -941,6 +943,7 @@ namespace vmesh {
    // No true warp divergence here: all uniform, only b_tid==0 is intentional
    ARCH_DEV inline bool VelocityMesh::warpPush_back(const vmesh::GlobalID& globalID, const size_t b_tid) {
       const vmesh::LocalID mySize = size();
+      // [Warp Divergence]
       if (mySize >= (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].max_velocity_blocks) return false;
       if (globalID == invalidGlobalID()) return false;
       #ifdef DEBUG_VMESH
@@ -952,12 +955,14 @@ namespace vmesh {
          inserted = false;
       }
       __syncthreads();
+      // [Warp Divergence]
       if (b_tid < GPUTHREADS) {
          // If exists, do not overwrite
          // [Use Restrict for R20]
          // LDG.E.64 R20, desc[UR36][R38.64];
          // inserted is a local variable
          inserted = globalToLocalMap->warpInsert_V<true>(globalID,(vmesh::LocalID)mySize, b_tid);
+         // [Warp Divergence]
          if (inserted == true && b_tid==0) {
             localToGlobalMap->device_push_back(globalID);
             ltg_size++;
