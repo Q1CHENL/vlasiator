@@ -305,7 +305,8 @@ namespace vmesh {
          if (blockLID >= numberOfBlocks) exitInvalidLocalID(blockLID,"getData");
          #endif
       #endif
-      // [Use Restrict for R24]
+      // [Use Restrict]
+      // for R24
       // LDG.E.64 R24, desc[UR36][R6.64];
       // No restrict needed here, just a pointer arithmetic
       return block_data->data() + blockLID*WID3;
@@ -624,12 +625,14 @@ namespace vmesh {
          parameters->resize((newSize)*BlockParams::N_VELOCITY_BLOCK_PARAMS,true,stream);
          block_data->resize((newSize)*WID3,true,stream);
          #else
+         // [Use Restrict]
          // LDG is already in use, so no meaningful texture memory usage further needed.
          const vmesh::LocalID currentCapacity = block_data->capacity()/WID3;
          // no meaningful warp divergence
          // 0% detected
          assert(newSize <= currentCapacity && "ERROR! Attempting to grow block container on-device beyond capacity (::push_back N_blocks).");
          block_data->device_resize((newSize)*WID3,false); //construct=false don't construct or set to zero
+         // [Use Restrict]
          // LDG is already in use, so no meaningful texture memory usage further needed.
          parameters->device_resize((newSize)*BlockParams::N_VELOCITY_BLOCK_PARAMS,false); //construct=false don't construct or set to zero
          #endif

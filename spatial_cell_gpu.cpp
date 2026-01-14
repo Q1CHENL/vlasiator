@@ -73,6 +73,8 @@ __global__ void __launch_bounds__(WID3,4) update_velocity_block_content_lists_ke
       #endif
       // Check each velocity cell if it is above the threshold
       const Realf* avgs = blockContainer->getData(blockLID);
+      // [Data conversion]
+      // F2F
       has_content[ti] = avgs[b_tid] >= velocity_block_min_value ? 1 : 0;
       __syncthreads(); // THIS SYNC IS CRUCIAL!
       // Implemented just a simple non-optimized thread OR
@@ -80,12 +82,14 @@ __global__ void __launch_bounds__(WID3,4) update_velocity_block_content_lists_ke
       for (unsigned int s=WID3/2; s>0; s>>=1) {
          // real warp divergence but intentional
          // 0% branch divergence detected in profiling
+         // [Warp Divergence]
          if (b_tid < s) {
             has_content[ti] = has_content[ti] || has_content[ti + s];
          }
          __syncthreads();
       }
       // Insert into map only from threads 0...WARPSIZE
+      // [Warp Divergence]
       // warp-uniform
       if (b_tid < GPUTHREADS) {
          if (has_content[0]) {
@@ -147,6 +151,7 @@ __global__ void update_velocity_halo_kernel (
       const vmesh::LocalID LID = vmesh->warpGetLocalID(nGID, w_tid);
       // Try adding this nGID to velocity_block_with_content_map. If it exists, do not overwrite.
       const bool newlyadded = dev_velocity_block_with_content_map->warpInsert_V<true>(nGID,LID, w_tid);
+      // [Warp Divergence]
       // warp-uniform
       if (newlyadded) {
          // Block did not previously exist in velocity_block_with_content_map
@@ -178,11 +183,13 @@ __global__ void update_neighbour_halo_kernel (
    //const int gpuBlocks = gridDim.x; // Equal to count of neighbour content blocks divided by (warps/block)
    const int ti = threadIdx.x; // [0,blockSize)
    const int w_tid = ti % GPUTHREADS; // [0,WARPSIZE)
+   // [Use Restrict]
    int myindex = blockIdx.x * WARPSPERBLOCK + ti / GPUTHREADS; // Starts off as total index
    // Find which neighbour we should access
    uint neigh_i = 0;
    for (uint i=0; i<neighbour_count; i++) {
       // dev_neigh_Nvbwcls is just a id that is only read, not write, no need to use restrict
+      // [Warp Divergence]
       if (myindex < (int)dev_neigh_Nvbwcls[neigh_i]) {
          break;
       }
@@ -196,6 +203,7 @@ __global__ void update_neighbour_halo_kernel (
       const vmesh::LocalID LID = vmesh->warpGetLocalID(nGID, w_tid);
       // Try adding this nGID to velocity_block_with_content_map. If it exists, do not overwrite.
       const bool newlyadded = dev_velocity_block_with_content_map->warpInsert_V<true>(nGID,LID, w_tid);
+      // [Warp Divergence]
       if (newlyadded) {
          // Block did not previously exist in velocity_block_with_content_map
          if ( LID != vmesh->invalidLocalID()) {
