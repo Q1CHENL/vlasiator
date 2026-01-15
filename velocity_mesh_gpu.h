@@ -392,6 +392,12 @@ namespace vmesh {
          for (int i=0; i<6; ++i) array[i] = std::numeric_limits<Real>::infinity();
       }
       #endif
+      
+      // static bool first_execution = true;
+      // if (first_execution) {
+      //    first_execution = false;
+      //    printf("population increment kernel executed\n");
+      // }
 
       vmesh::LocalID indices[3];
       // [Datatype Conversion]
@@ -513,23 +519,29 @@ namespace vmesh {
    }
 
    ARCH_HOSTDEV inline void VelocityMesh::getIndicesX(const vmesh::GlobalID& globalID,vmesh::LocalID& i) const {
+      // [Warp Divergence]
       if (globalID >= invalidGlobalID()) {
          i = invalidBlockIndex();
       } else {
+         // [Data conversion] I2F and F2I
          i = globalID % (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[0];
       }
    }
    ARCH_HOSTDEV inline void VelocityMesh::getIndicesY(const vmesh::GlobalID& globalID,vmesh::LocalID& j) const {
+      // [Warp Divergence]
       if (globalID >= invalidGlobalID()) {
          j = invalidBlockIndex();
       } else {
+         // [Data conversion] I2F and F2I
          j = (globalID / (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[0]) % (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[1];
       }
    }
    ARCH_HOSTDEV inline void VelocityMesh::getIndicesZ(const vmesh::GlobalID& globalID,vmesh::LocalID& k) const {
+      // [Warp Divergence]
       if (globalID >= invalidGlobalID()) {
          k = invalidBlockIndex();
       } else {
+         // [Data conversion] I2F and F2I
          k = globalID / ((*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[0] * (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[1]);
       }
    }

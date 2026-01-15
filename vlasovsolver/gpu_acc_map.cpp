@@ -48,6 +48,7 @@ __device__ void inline swapBlockIndices(vmesh::LocalID &blockIndices0,vmesh::Loc
    vmesh::LocalID temp;
    // Switch block indices according to dimensions, the algorithm has
    // been written for integrating along z.
+   // [Warp Divergence]
    switch (dimension){
    case 0:
       /*i and k coordinates have been swapped*/
@@ -83,6 +84,7 @@ __global__ void __launch_bounds__(VECL,4) reorder_blocks_by_dimension_kernel(
    const int ti = threadIdx.x;
    const uint iColumn = blockIdx.x;
    Realf *gpu_blockData = blockContainer->getData();
+   // [Warp Divergence]
    if (nThreads != VECL) {
       if (ti==0) printf("Warning! VECL not matching thread count for GPU kernel!\n");
    }
@@ -93,6 +95,7 @@ __global__ void __launch_bounds__(VECL,4) reorder_blocks_by_dimension_kernel(
       uint columnLength = columnData->columnNumBlocks[iColumn];
 
       // Loop over column blocks
+      // [Warp Divergence]
       for (uint b = 0; b < columnLength; b++) {
          // Slices
          for (uint k=0; k<WID; ++k) {
@@ -106,11 +109,14 @@ __global__ void __launch_bounds__(VECL,4) reorder_blocks_by_dimension_kernel(
                int input_0 = input - input_2 * WID2 - input_1 * WID; // first (fastest) index
                // slice vector index
                int jk = j / (VECL/WID);
+               // [Use Shared]
                int sourceindex = input_0 * gpu_cell_indices_to_id[0]
                   + input_1 * gpu_cell_indices_to_id[1]
                   + input_2 * gpu_cell_indices_to_id[2];
 
                gpu_blockDataOrdered[outputOffset + i_pcolumnv_gpu_b(jk, k, b, columnLength)][ti]
+               // [Use Restrict]
+               // [Use Shared]
                   = gpu_blockData[ gpu_LIDlist[inputOffset + b] * WID3
                                    + sourceindex ];
 
@@ -147,11 +153,14 @@ __global__ void __launch_bounds__(1,4) count_columns_kernel (
    // const int warpSize = blockDim.x * blockDim.y * blockDim.z;
    const int blocki = blockIdx.z*gridDim.x*gridDim.y + blockIdx.y*gridDim.x + blockIdx.x;
    const int ti = threadIdx.z*blockDim.x*blockDim.y + threadIdx.y*blockDim.x + threadIdx.x;
+   // [Warp Divergence]
    if ((blocki==0)&&(ti==0)) {
+      // [Warp Divergence]
       for(uint setIndex=0; setIndex< gpu_columnData->setColumnOffsets.size(); ++setIndex) {
          returnLID[0] += gpu_columnData->setNumColumns[setIndex];
          for(uint columnIndex = gpu_columnData->setColumnOffsets[setIndex]; columnIndex < gpu_columnData->setColumnOffsets[setIndex] + gpu_columnData->setNumColumns[setIndex] ; columnIndex ++){
             // Might beUse Restrict chance
+            // [Use Restrict]
             returnLID[1] += (gpu_columnData->columnNumBlocks[columnIndex] + 2) * WID3 / VECL;
          }
       }
@@ -177,11 +186,16 @@ __global__ void __launch_bounds__(1,4) offsets_into_columns_kernel(
    const int ti = threadIdx.z*blockDim.x*blockDim.y + threadIdx.y*blockDim.x + threadIdx.x;
    if ((blocki==0)&&(ti==0)) {
       uint valuesColumnOffset = 0;
+      // [Warp Divergence]
       for( uint setIndex=0; setIndex< gpu_columnData->setColumnOffsets.size(); ++setIndex) {
+         // [Register Spilling]
+         // [Warp Divergence]
          for (uint columnIndex = gpu_columnData->setColumnOffsets[setIndex]; columnIndex < gpu_columnData->setColumnOffsets[setIndex] + gpu_columnData->setNumColumns[setIndex] ; columnIndex ++){
             gpu_columns[columnIndex].nblocks = gpu_columnData->columnNumBlocks[columnIndex];
             gpu_columns[columnIndex].valuesOffset = valuesColumnOffset;
+            // [Warp Divergence]
             if (valuesColumnOffset >= valuesSizeRequired) {
+               // [Register Spilling]
                printf("(ERROR: Overflowing the values array (%d > %d) with column %d\n",valuesColumnOffset,valuesSizeRequired,columnIndex);
             }
             valuesColumnOffset += (gpu_columnData->columnNumBlocks[columnIndex] + 2) * (WID3/VECL); // there are WID3/VECL elements of type Vec per block
@@ -222,8 +236,10 @@ __global__ void __launch_bounds__(GPUTHREADS,4) evaluate_column_extents_kernel(
    if (setIndex < gpu_columnData->setColumnOffsets.size()) {
 
       // Clear flags used for this columnSet
+      // [Warp Divergence]
       for(uint tti = 0; tti < MAX_BLOCKS_PER_DIM; tti += warpSize ) {
          const uint index = tti + ti;
+         // [Warp Divergence]
          if (index < MAX_BLOCKS_PER_DIM) {
             isTargetBlock[index] = 0;
             isSourceBlock[index] = 0;
@@ -242,14 +258,17 @@ __global__ void __launch_bounds__(GPUTHREADS,4) evaluate_column_extents_kernel(
         block. Needed for computig maximum extent of target column*/
 
       Realv max_intersectionMin = intersection +
+      // [Datatype conversion] I2F
          (setFirstBlockIndices0 * WID + 0) * intersection_di +
          (setFirstBlockIndices1 * WID + 0) * intersection_dj;
       max_intersectionMin =  std::max(max_intersectionMin,
                                       intersection +
                                       (setFirstBlockIndices0 * WID + 0) * intersection_di +
+                                      // [Datatype conversion] I2F
                                       (setFirstBlockIndices1 * WID + WID - 1) * intersection_dj);
       max_intersectionMin =  std::max(max_intersectionMin,
                                       intersection +
+                                      // [Datatype conversion] I2F
                                       (setFirstBlockIndices0 * WID + WID - 1) * intersection_di +
                                       (setFirstBlockIndices1 * WID + 0) * intersection_dj);
       max_intersectionMin =  std::max(max_intersectionMin,
@@ -299,6 +318,7 @@ __global__ void __launch_bounds__(GPUTHREADS,4) evaluate_column_extents_kernel(
           *  edge in source grid.
           * lastBlockV is in z the maximum velocity value of the upper
           *  edge in source grid. */
+          // [Datatype conversion] I2F
          Realv firstBlockMinV = (WID * firstBlockIndices2) * dv + v_min;
          Realv lastBlockMaxV = (WID * (lastBlockIndices2 + 1)) * dv + v_min;
 
@@ -306,6 +326,7 @@ __global__ void __launch_bounds__(GPUTHREADS,4) evaluate_column_extents_kernel(
             grid. This distance between max_intersectionMin (so lagrangian
             plan, well max value here) and V of source grid, divided by
             intersection_dk to find out how many grid cells that is*/
+         // [Datatype conversion] F2I
          const int firstBlock_gk = (int)((firstBlockMinV - max_intersectionMin)/intersection_dk);
          const int lastBlock_gk = (int)((lastBlockMaxV - min_intersectionMin)/intersection_dk);
 
@@ -359,10 +380,12 @@ __global__ void __launch_bounds__(GPUTHREADS,4) evaluate_column_extents_kernel(
          }
       } // end loop over columns in set
       __syncthreads();
-
+      // [Warp Divergence]
       for (uint blockT = 0; blockT < MAX_BLOCKS_PER_DIM; blockT +=warpSize) {
          const uint blockK = blockT + ti;
+         // [Warp Divergence]
          if (blockK < MAX_BLOCKS_PER_DIM) {
+            // [Warp Divergence]
             if(isTargetBlock[blockK]!=0)  {
                const int targetBlock =
                   setFirstBlockIndices0 * gpu_block_indices_to_id[0] +
@@ -374,6 +397,7 @@ __global__ void __launch_bounds__(GPUTHREADS,4) evaluate_column_extents_kernel(
                //    return;
                // }
             }
+            // [Warp Divergence]
             if(isTargetBlock[blockK]!=0 && isSourceBlock[blockK]==0 )  {
                const int targetBlock =
                   setFirstBlockIndices0 * gpu_block_indices_to_id[0] +
@@ -451,6 +475,9 @@ __global__ void __launch_bounds__(VECL,4) acceleration_kernel(
             j_indices * gpu_cell_indices_to_id[1];
          const Realf intersection_min =
             intersection +
+            // [Datatype Conversion]
+            // I2F
+            // [Use Texture]
             (gpu_columns[column].i * WID + (Realv)i_indices) * intersection_di +
             (gpu_columns[column].j * WID + (Realv)j_indices) * intersection_dj;
 
@@ -464,6 +491,7 @@ __global__ void __launch_bounds__(VECL,4) acceleration_kernel(
             (gpu_columns[column].j * WID + (Realv)( intersection_dj < 0 ? j : j+VECL/WID-1 )) * intersection_dj;
 
          // loop through all perpendicular slices in column and compute the mapping as integrals.
+         // [Warp Divergence]
          for (uint k=0; k < WID * nblocks; ++k) {
             // Compute reconstructions
             // Checked on 21.01.2022: Realv a[length] goes on the register despite being an array. Explicitly declaring it
@@ -485,6 +513,7 @@ __global__ void __launch_bounds__(VECL,4) acceleration_kernel(
             // (in reduced cell units), this will be shifted to target_density_1, see below.
             Realf target_density_r = 0.0;
 
+            // [Datatype Conversion] I2F
             const Realv v_r = v_r0  + (k+1)* dv;
             const Realv v_l = v_r0  + k* dv;
             const int lagrangian_gk_l = trunc((v_l-gk_intersection_max)/intersection_dk);
@@ -498,6 +527,7 @@ __global__ void __launch_bounds__(VECL,4) acceleration_kernel(
             // Run along the column and perform the polynomial reconstruction
             // 2.5% Branch divergence
             // More of a noise
+            // [Warp Divergence]
             for(int gk = minGk; gk <= maxGk; gk++) {
                const int blockK = gk/WID;
                const int gk_mod_WID = (gk - blockK * WID);
@@ -511,6 +541,7 @@ __global__ void __launch_bounds__(VECL,4) acceleration_kernel(
                //then v_1,v_2 should be between v_l and v_r.
                //v_1 and v_2 normalized to be between 0 and 1 in the cell.
                //For vector elements where gk is already larger than needed (lagrangian_gk_r), v_2=v_1=v_r and thus the value is zero.
+               // [Datatype Conversion] I2F
                const Realf v_norm_r = (  min(  max( (gk + 1) * intersection_dk + intersection_min, v_l), v_r) - v_l) * i_dv;
 
                /*shift, old right is new left*/

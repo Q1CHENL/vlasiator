@@ -78,10 +78,13 @@ ARCH_DEV inline void compute_ppm_coeff_nonuniform(const Realf * const dv, const 
    Realf m_face = fv_l;
    Realf p_face = fv_r;
 
+   // [Datatype Conversion] F2F
+   // [Warp Divergence]
    m_face = ((p_face - m_face) * (values[k][index] - 0.5 * (m_face + p_face)) >
              (p_face - m_face)*(p_face - m_face) * (1./6.)) ?
              3 * values[k][index] - 2 * p_face :
                    m_face;
+   // [Datatype Conversion] F2F
    p_face = (-(p_face - m_face) * (p_face - m_face) * (1./6.)) >
                    (p_face - m_face) * (values[k][index] - 0.5 * (m_face + p_face)) ?
                    3 * values[k][index] - 2 * m_face :
@@ -90,6 +93,7 @@ ARCH_DEV inline void compute_ppm_coeff_nonuniform(const Realf * const dv, const 
    //Fit a second order polynomial for reconstruction see, e.g., White
    //2008 (PQM article) (note additional integration factors built in,
    //contrary to White (2008) eq. 4
+   // [Datatype Conversion] F2F
    a[0] = m_face;
    a[1] = 3.0 * values[k][index] - 2.0 * m_face - p_face;
    a[2] = (m_face + p_face - 2.0 * values[k][index]);

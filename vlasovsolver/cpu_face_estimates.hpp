@@ -540,6 +540,8 @@ ARCH_HOSTDEV inline void compute_filtered_face_values_nonuniform_conserving(cons
 
 ARCH_DEV inline void compute_h8_left_face_value(const Vec * const values, uint k, Realf &fv_l, const int index)
 {
+   // [Datatype Conversion]
+   // F2F
    fv_l = 1.0/840.0 * (
               - 3.0 * values[k - 4][index]
               + 29.0 * values[k - 3][index]
@@ -559,6 +561,7 @@ ARCH_DEV inline void compute_h7_left_face_derivative(const Vec * const values, u
        + 7175.0 * values[k][index]
        - 889.0 * values[k + 1][index]
        + 119.0 * values[k + 2][index]
+       // [Datatype Conversion]
        - 9.0 * values[k + 3][index]);
 }
 ARCH_DEV inline void compute_h6_left_face_value(const Vec * const values, uint k, Realf &fv_l, const int index)
@@ -605,6 +608,8 @@ ARCH_DEV inline void compute_h4_left_face_value(const Vec * const values, uint k
 }
 
 ARCH_DEV inline void compute_h4_left_face_value_nonuniform(const Realf * const h, const Vec * const u, uint k, Realf &fv_l, const int index) {
+   // [Datatype Conversion] F2F
+   // [Use Restrict]
    fv_l = (
            1.0 / ( h[k - 2] + h[k - 1] + h[k] + h[k + 1] )
            * ( ( h[k - 2] + h[k - 1] ) * ( h[k] + h[k + 1] ) / ( h[k - 1] + h[k] )
@@ -674,6 +679,7 @@ ARCH_DEV inline void compute_filtered_face_values_derivatives(const Vec * const 
    if(filter)
    {
       //Go to linear (PLM) estimates if not ok (this is always ok!)
+      // [Datatype Conversion] F2F
       fv_l= (filter) ? values[k ][index] - slope_sign * 0.5 * slope_abs : fv_l;
       fd_l= (filter) ? slope_sign * slope_abs : fd_l;
    }
@@ -682,6 +688,7 @@ ARCH_DEV inline void compute_filtered_face_values_derivatives(const Vec * const 
    if(filter)
    {
       //Go to linear (PLM) estimates if not ok (this is always ok!)
+      // [Datatype Conversion] F2F
       fv_r= (filter) ? values[k][index] + slope_sign * 0.5 * slope_abs : fv_r;
       fd_r= (filter) ? slope_sign * slope_abs : fd_r;
    }
@@ -764,6 +771,7 @@ ARCH_DEV inline void compute_filtered_face_values_nonuniform(const Realf * const
      break;
   }
    Realf slope_abs,slope_sign;
+   // [Warp Divergence]
    if (threshold>0) {
       // scale values closer to 1 for more accurate slope limiter calculation
       const Realv scale = 1./threshold;
@@ -782,12 +790,14 @@ ARCH_DEV inline void compute_filtered_face_values_nonuniform(const Realf * const
    //Fix left face if needed; boundary value is not bounded
    if ((values[k -1][index] - fv_l) * (fv_l - values[k][index]) < 0) {
       //Go to linear (PLM) estimates if not ok (this is always ok!)
+      // [Datatype Conversion] F2F
       fv_l=values[k][index] - slope_sign * 0.5 * slope_abs;
    }
 
    //Fix  face if needed; boundary value is not bounded
    if ((values[k + 1][index] - fv_r) * (fv_r - values[k][index]) < 0) {
       //Go to linear (PLM) estimates if not ok (this is always ok!)
+      // [Datatype Conversion] F2F
       fv_r=values[k][index] + slope_sign * 0.5 * slope_abs;
    }
 }

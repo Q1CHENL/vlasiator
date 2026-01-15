@@ -185,6 +185,7 @@ static ARCH_DEV inline void filter_pqm_monotonicity(Vec *values, uint k, Realf &
    /*fixed values give to roots clearly outside [0,1], or nonexisting ones*/
 
    /*second derivative coefficients, eq 23 in white et al.*/
+   // [Datatype Conversion] F2F
    Realf b0 =   60.0 * values[k][index] - 24.0 * fv_r - 36.0 * fv_l + 3.0 * (fd_r - 3.0 * fd_l);
    Realf b1 = -360.0 * values[k][index] + 36.0 * fd_l - 24.0 * fd_r + 168.0 * fv_r + 192.0 * fv_l;
    Realf b2 =  360.0 * values[k][index] + 30.0 * (fd_r - fd_l) - 180.0 * (fv_l + fv_r);
@@ -196,8 +197,10 @@ static ARCH_DEV inline void filter_pqm_monotonicity(Vec *values, uint k, Realf &
    // e.g 2.5% Branch divergence
    // Intentional, explained by the comments above
    const Realf val_to_sqrt = b1 * b1 - 4 * b0 * b2;
+   // [Warp Divergence]
    const Realf sqrt_val = (val_to_sqrt < 0.0) ?
                                b1 + 200.0 * b2 :
+                               // [Datatype Conversion] F2F
                                sqrt(val_to_sqrt);
    //compute roots. Division is safe with vectorclass (=inf)
    const Realf root1 = (b2 != 0) ? (-b1 + sqrt_val) / (2 * b2) : 0;
@@ -236,18 +239,22 @@ static ARCH_DEV inline void filter_pqm_monotonicity(Vec *values, uint k, Realf &
       // These are also intentional branch divergences
       // PQM monotonicity / collapse logic: collapse to left vs right edge 
       // then consistency check
+      // [Warp Divergence]
       if(fabs(plm_slope_l) <= fabs(plm_slope_r))
       {
          //collapse to left edge (eq 21)
+         // [Datatype Conversion] F2F
          fda_l =  1.0 / 3.0 * ( 10 * valuesa - 2.0 * fva_r - 8.0 * fva_l);
          fda_r =  -10.0 * valuesa + 6.0 * fva_r + 4.0 * fva_l;
          //check if PLM slope is consistent (eq 28 & 29)
+         // [Warp Divergence]
          if (slope_signa * fda_l < 0)
          {
             fda_l =  0;
             fva_r =  5 * valuesa - 4 * fva_l;
             fda_r =  20 * (valuesa - fva_l);
          }
+         // [Warp Divergence]
          else if (slope_signa * fda_r < 0)
          {
             fda_r =  0;
@@ -258,15 +265,19 @@ static ARCH_DEV inline void filter_pqm_monotonicity(Vec *values, uint k, Realf &
       else
       {
          //collapse to right edge (eq 21)
+         // [Datatype Conversion] F2F
          fda_l =  10.0 * valuesa - 6.0 * fva_l - 4.0 * fva_r;
          fda_r =  1.0 / 3.0 * ( - 10.0 * valuesa + 2 * fva_l + 8 * fva_r);
          //check if PLM slope is consistent (eq 28 & 29)
+         // [Warp Divergence]
          if (slope_signa * fda_l < 0)
          {
             fda_l =  0;
             fva_r =  0.5 * ( 5 * valuesa - 3 * fva_l);
+            // [Datatype Conversion] F2F
             fda_r =  10.0 / 3.0 * (valuesa - fva_l);
          }
+         // [Warp Divergence]
          else if (slope_signa * fda_r < 0)
          {
             fda_r =  0;
@@ -295,6 +306,8 @@ static ARCH_DEV inline void compute_pqm_coeff(Vec *values, face_estimate_order o
    //contrary to White (2008) eq. 4
    a[0] = fv_l;
    a[1] = fd_l/2.0;
+   // [Datatype Conversion] F2F
+   // [Warp Divergence]
    a[2] =  10.0 * values[k][index] - 4.0 * fv_r - 6.0 * fv_l + 0.5 * (fd_r - 3 * fd_l);
    a[3] = -15.0 * values[k][index]  + 1.5 * fd_l - fd_r + 7.0 * fv_r + 8 * fv_l;
    a[4] =   6.0 * values[k][index] +  0.5 * (fd_r - fd_l) - 3.0 * (fv_l + fv_r);

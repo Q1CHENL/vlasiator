@@ -59,12 +59,20 @@ __global__ void reduce_v_dt_kernel(
    vmesh::VelocityMesh* thisVmesh = allVmeshPointer->at(cellIndex);
    uint thisVmeshSize = thisVmesh->size();
    Real blockInfo[6];
+   // [Use Restrict]
+   // [Use Texture]
    const Real dx = dev_dxdydz[3*cellIndex + 0];
+   // [Use Restrict]
+   // [Use Texture]
    const Real dy = dev_dxdydz[3*cellIndex + 1];
+   // [Use Texture]
+   // [Datatype conversion] I2F
+   // [Use Restrict]
    const Real dz = dev_dxdydz[3*cellIndex + 2];
    const Real EPS = numeric_limits<Real>::min() * 1000;
    const Real HALF = 0.5;
 
+   // [Warp Divergence]
    for (uint blockIndex = ti/2; blockIndex < thisVmeshSize; blockIndex += blockSize/2) {
       if (blockIndex < thisVmeshSize) {
          const vmesh::GlobalID GID = thisVmesh->getGlobalID(blockIndex);

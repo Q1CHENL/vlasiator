@@ -38,6 +38,7 @@
 // Skip remapping if whole stencil for all vector elements consists of zeroes
 __host__ __device__ inline bool check_skip_remapping(Vec* values, uint vectorindex) {
    for (int index=-VLASOV_STENCIL_WIDTH; index<VLASOV_STENCIL_WIDTH+1; ++index) {
+      // [Warp Divergence]
       if (values[index][vectorindex] > 0) return false;
    }
    return true;
@@ -95,6 +96,8 @@ __global__ void __launch_bounds__(WID3, 4) translation_kernel(
    //const int warpSize = blockDim.x*blockDim.y*blockDim.z;
    const uint startingBlockIndex = blockIdx.y*gridDim.x;
    const uint blockIndexIncrement = gridDim.y*gridDim.x;
+   // [Use Restrict]
+   // [Use Texture]
    Vec* pencilOrderedSource = dev_pencilOrderedPointers[blockIdx.y];
 
    // This is launched with block size (WID,WID,WID) assuming that VECL==WID2 and VEC_PER_BLOCK=WID
@@ -104,6 +107,7 @@ __global__ void __launch_bounds__(WID3, 4) translation_kernel(
 
    // Translation direction
    uint vz_index;
+   // [Warp Divergence]
    switch (dimension) {
    case 0:
       vz_index = threadIdx.x;
@@ -126,7 +130,9 @@ __global__ void __launch_bounds__(WID3, 4) translation_kernel(
    vmesh::VelocityMesh** pencilMeshes = allPencilsMeshes->data();
    vmesh::VelocityBlockContainer** pencilContainers = allPencilsContainers->data();
    vmesh::VelocityMesh* randovmesh = pencilMeshes[0]; // just some vmesh
+   // [Datatype conversion] F2F
    const Realv dvz = randovmesh->getCellSize()[dimension];
+   // [Datatype conversion] F2F
    const Realv vz_min = randovmesh->getMeshMinLimits()[dimension];
 
    // Acting on velocity block blockGID, now found from array
@@ -134,21 +140,26 @@ __global__ void __launch_bounds__(WID3, 4) translation_kernel(
       if (thisBlockIndex >= nAllBlocks) {
          break;
       }
+      // [Use Texture]
       const uint blockGID = allBlocks[thisBlockIndex];
       // First read data in
       for (uint pencili=0; pencili<nPencils; pencili++) {
+         // [Use Texture]
          const uint lengthOfPencil = pencilLengths[pencili];
+         // [Use Texture]
          const uint start = pencilStarts[pencili];
          // Get pointer to temprary buffer of VEC-ordered data for this kernel
          Vec* thisPencilOrderedSource = pencilOrderedSource + pencilOrderedSourceOffset + start * WID3/VECL;
          uint nonEmptyBlocks = 0;
          // Go over pencil length, gather cellblock data into aligned pencil source data
+         // [Warp Divergence]
          for (uint celli = 0; celli < lengthOfPencil; celli++) {
             vmesh::VelocityMesh* vmesh = pencilMeshes[start + celli];
             // const vmesh::LocalID blockLID = vmesh->getLocalID(blockGID);
             // Now using warp accessor.
             const vmesh::LocalID blockLID = vmesh->warpGetLocalID(blockGID,ti);
             // Store block data pointer for both loading of data and writing back to the cell
+            // [Warp Divergence]
             if (blockLID == vmesh->invalidLocalID()) {
                if (ti==0) {
                   pencilBlockData[pencilBlockDataOffset + start + celli] = NULL;
@@ -166,6 +177,7 @@ __global__ void __launch_bounds__(WID3, 4) translation_kernel(
                   }
                }
                #endif
+               // [Warp Divergence]
                if (ti==0) {
                   pencilBlockData[pencilBlockDataOffset + start + celli] = pencilContainers[start + celli]->getData(blockLID);
                   nonEmptyBlocks++;
@@ -173,7 +185,9 @@ __global__ void __launch_bounds__(WID3, 4) translation_kernel(
                __syncthreads();
                // Valid block, store values in Vec-order for efficient reading in propagation
                // Transpose block values so that mapping is along k direction.
+               // [Warp Divergence]
                thisPencilOrderedSource[i_trans_ps_blockv_pencil(planeIndex, celli, lengthOfPencil)][vecIndex]
+               // [Use Texture]
                   = (pencilBlockData[pencilBlockDataOffset + start + celli])[ti];
             }
          } // End loop over this pencil
@@ -185,7 +199,9 @@ __global__ void __launch_bounds__(WID3, 4) translation_kernel(
 
       __syncthreads();
       // Now we reset target blocks
+      // [Warp Divergence]
       for (uint celli=0; celli<sumOfLengths; celli++) {
+         // [Warp Divergence]
          if (pencilRatios[celli] != 0) {
             // Is a target cell, needs to be reset
             if (pencilBlockData[pencilBlockDataOffset + celli]) {
@@ -205,6 +221,7 @@ __global__ void __launch_bounds__(WID3, 4) translation_kernel(
       // Get velocity data from vmesh that we need later to calculate the translation
       __syncthreads();
       vmesh::LocalID blockIndicesD = 0;
+      // [Warp Divergence]
       if (dimension==0) {
          randovmesh->getIndicesX(blockGID, blockIndicesD);
       } else if (dimension==1) {
@@ -217,7 +234,10 @@ __global__ void __launch_bounds__(WID3, 4) translation_kernel(
       // In fact propagating to > 1 neighbor will give an error
       // Also defined in the calling function for the allocation of targetValues
       // const uint nTargetNeighborsPerPencil = 1;
+      // [Datatype conversion] F2F and I2F
+      // [Warp Divergence]
       for (uint pencili=0; pencili<nPencils; pencili++) {
+         // [Warp Divergence]
          if (pencilBlocksCount[pencilBlocksCountOffset + pencili] == 0) {
             continue;
          }
@@ -226,14 +246,18 @@ __global__ void __launch_bounds__(WID3, 4) translation_kernel(
          Vec* thisPencilOrderedSource = pencilOrderedSource + pencilOrderedSourceOffset + start * WID3/VECL;
 
          // Go over length of propagated cells
+         // [Warp Divergence]
          for (uint i = VLASOV_STENCIL_WIDTH; i < lengthOfPencil-VLASOV_STENCIL_WIDTH; i++){
             // Get pointers to block data used for output.
+            // [Use Restrict]
             Realf* block_data_m1 = pencilBlockData[pencilBlockDataOffset + start + i - 1];
             Realf* block_data =    pencilBlockData[pencilBlockDataOffset + start + i];
+            // [Use Restrict]
             Realf* block_data_p1 = pencilBlockData[pencilBlockDataOffset + start + i + 1];
 
             // Cells which shouldn't be written to (e.g. sysboundary cells) have a targetRatio of 0
             // Also need to check if pointer is valid, because a cell can be missing an elsewhere propagated block
+            // [Use Restrict]
             Realf areaRatio_m1 = pencilRatios[start + i - 1];
             Realf areaRatio =    pencilRatios[start + i];
             Realf areaRatio_p1 = pencilRatios[start + i + 1];
@@ -285,19 +309,24 @@ __global__ void __launch_bounds__(WID3, 4) translation_kernel(
                // Now because each GPU block handles all pencils for an unique GID, we shouldn't need atomic additions here.
 
                // NOTE: not using atomic operations causes huge diffs (as if self contribution was neglected)! 11.01.2024 MB
+               // [Warp Divergence]
                if (areaRatio && block_data) {
                   const Realf selfContribution = (thisPencilOrderedSource[i_trans_ps_blockv_pencil(planeIndex, i, lengthOfPencil)][vecIndex] - ngbr_target_density) * areaRatio;
                   //atomicAdd(&block_data[ti],selfContribution);
                   block_data[ti] += selfContribution;
                }
+               // [Warp Divergence]
                if (areaRatio_p1 && block_data_p1) {
+                  // [Warp Divergence]
                   const Realf p1Contribution = (positiveTranslationDirection ? ngbr_target_density
+                     // [Datatype Conversion] F2F
                                                 * pencilDZ[start + i] / pencilDZ[start + i + 1] : 0.0) * areaRatio_p1;
                   //atomicAdd(&block_data_p1[ti],p1Contribution);
                   block_data_p1[ti] += p1Contribution;
                }
                if (areaRatio_m1 && block_data_m1) {
                   const Realf m1Contribution = (!positiveTranslationDirection ? ngbr_target_density
+                     // [Datatype Conversion] F2F
                                                 * pencilDZ[start + i] / pencilDZ[start + i - 1] : 0.0) * areaRatio_m1;
                   //atomicAdd(&block_data_m1[ti],m1Contribution);
                   block_data_m1[ti] += m1Contribution;
@@ -601,6 +630,7 @@ __global__ static void remote_increment_kernel (
    // atomicAdd(&blockData[blocki * WID3 + ti],neighborData[blocki * WID3 + ti]);
    // As each target block has its own GPU stream, we ensure that we don't write concurrently from
    // several different threads or kernels, and thus don't need to use atomic operations.
+   // [Use Restrict]
    blockData[blocki * WID3 + ti] += neighborData[blocki * WID3 + ti];
 }
 

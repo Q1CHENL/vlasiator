@@ -287,7 +287,6 @@ namespace vmesh {
       return BLOCK_ALLOCATION_FACTOR;
    }
 
-   // Not really Use Restrict chances
    inline ARCH_HOSTDEV Realf* VelocityBlockContainer::getData() {
       return block_data->data();
    }
