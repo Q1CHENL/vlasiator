@@ -527,6 +527,13 @@ namespace vmesh {
       } else {
          // [Data conversion]
          // I2F and F2I
+         // Assessment: Not a real chance of optimization
+         // Reason:
+         // i, j, k are unit_32_t
+         // (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[0] is LocalID (unit_32_t)
+         // despite all are int, compiler might implement int div/mod using a fast 
+         // reciprocal-based algorithm that goes through floating-point 
+         // temporarily (convert → approximate reciprocal/divide → convert back)
          i = globalID % (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[0];
          j = (globalID / (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[0]) % (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[1];
          k = globalID / ((*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[0] * (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[1]);
@@ -1346,6 +1353,11 @@ namespace vmesh {
    ARCH_DEV inline void VelocityMesh::device_setNewSize(const vmesh::LocalID& newSize) {
       const vmesh::LocalID currentCapacity = localToGlobalMap->capacity();
       // [Datatype conversion]
+      // Assessment: no real chance of optimization
+      // Reason:
+      // newSize and currentCapacity are LocalID (unit_32_t)
+      // device_resize accepts size_t (64-bit)
+      // But really won't make any difference in performance.
       assert(newSize <= currentCapacity && "insufficient vector capacity in vmesh::device_setNewSize");
       const int currentSizePower = globalToLocalMap->getSizePower();
       const int newSize2 = newSize > 0 ? newSize : 1;

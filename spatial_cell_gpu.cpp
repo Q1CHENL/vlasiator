@@ -75,6 +75,13 @@ __global__ void __launch_bounds__(WID3,4) update_velocity_block_content_lists_ke
       const Realf* avgs = blockContainer->getData(blockLID);
       // [Data conversion]
       // F2F
+      // Assessment: Not a real chance of optimization
+      // Reason: 
+      // 
+      // avgs is an array of Realf, velocity_block_min_value is a Real
+      // But this is just one comparison, and it is not worth to change the datatype for this
+      // by making the code more complex and less readable.
+      // Avoid the conversion wont bring any performance improvement
       has_content[ti] = avgs[b_tid] >= velocity_block_min_value ? 1 : 0;
       __syncthreads(); // THIS SYNC IS CRUCIAL!
       // Implemented just a simple non-optimized thread OR
