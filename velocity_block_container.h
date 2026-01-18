@@ -288,6 +288,8 @@ namespace vmesh {
    }
 
    inline ARCH_HOSTDEV Realf* VelocityBlockContainer::getData() {
+      // [Use Restrict]
+      // Not really Use Restrict chances
       return block_data->data();
    }
 
