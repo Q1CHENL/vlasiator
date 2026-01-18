@@ -131,8 +131,18 @@ __global__ void __launch_bounds__(WID3, 4) translation_kernel(
    vmesh::VelocityBlockContainer** pencilContainers = allPencilsContainers->data();
    vmesh::VelocityMesh* randovmesh = pencilMeshes[0]; // just some vmesh
    // [Datatype conversion] F2F
+   // Assessment: Not a real chance of optimization
+   // randovmesh->getCellSize()[dimension] is double (Real)
+   // Realv is float with SFP
+   // It's a build flag decision
+   // See Makefile for more details
    const Realv dvz = randovmesh->getCellSize()[dimension];
    // [Datatype conversion] F2F
+   // Assessment: Not a real chance of optimization
+   // randovmesh->getMeshMinLimits()[dimension] is double (Real)
+   // Realv is float with SFP
+   // It's a build flag decision
+   // See Makefile for more details
    const Realv vz_min = randovmesh->getMeshMinLimits()[dimension];
 
    // Acting on velocity block blockGID, now found from array
@@ -235,6 +245,13 @@ __global__ void __launch_bounds__(WID3, 4) translation_kernel(
       // Also defined in the calling function for the allocation of targetValues
       // const uint nTargetNeighborsPerPencil = 1;
       // [Datatype conversion] F2F and I2F
+      // Assessment: Not a real chance of optimization
+      // Reason:
+      // No conevrsion in the loop header
+      // might refer to the later code:
+      // const Realf cell_vz = (blockIndicesD * WID + vz_index + 0.5) * dvz + vz_min; //cell centered velocity
+      // Where conversion is also inevitable because we need int WID and vz_index to derive int blockIndicesD
+
       // [Warp Divergence]
       for (uint pencili=0; pencili<nPencils; pencili++) {
          // [Warp Divergence]
@@ -320,6 +337,9 @@ __global__ void __launch_bounds__(WID3, 4) translation_kernel(
                   // [Warp Divergence]
                   const Realf p1Contribution = (positiveTranslationDirection ? ngbr_target_density
                      // [Datatype Conversion] F2F
+                     // Assessment: real chance of optimization (applied)
+                     // Reason: 0.0 is double, all others are float
+                     // 0.0f is float
                                                 * pencilDZ[start + i] / pencilDZ[start + i + 1] : 0.0) * areaRatio_p1;
                   //atomicAdd(&block_data_p1[ti],p1Contribution);
                   block_data_p1[ti] += p1Contribution;
@@ -327,6 +347,9 @@ __global__ void __launch_bounds__(WID3, 4) translation_kernel(
                if (areaRatio_m1 && block_data_m1) {
                   const Realf m1Contribution = (!positiveTranslationDirection ? ngbr_target_density
                      // [Datatype Conversion] F2F
+                     // Assessment: real chance of optimization (applied)
+                     // Reason: 0.0 is double, all others are float
+                     // 0.0f is float
                                                 * pencilDZ[start + i] / pencilDZ[start + i - 1] : 0.0) * areaRatio_m1;
                   //atomicAdd(&block_data_m1[ti],m1Contribution);
                   block_data_m1[ti] += m1Contribution;

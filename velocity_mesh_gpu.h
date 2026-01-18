@@ -402,6 +402,16 @@ namespace vmesh {
       vmesh::LocalID indices[3];
       // [Datatype Conversion]
       // All 3 lines are I2F and F2I: int to float and float to int
+      // Assessment: 
+      // Reason:
+      // indices is an array of vmesh::LocalID (unit_32_t)
+      // 
+      // Inevitable datatype conversion f2i to derive the index
+      // indices is an array of vmesh::LocalID (unit_32_t)
+      // (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[0] is LocalID (unit_32_t)
+      // despite all are int, compiler might implement int div/mod using a fast 
+      // reciprocal-based algorithm that goes through floating-point 
+      // temporarily (convert → approximate reciprocal/divide → convert back)
       indices[0] = globalID % (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[0];
       indices[1] = (globalID / (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[0]) % (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[1];
       indices[2] = globalID / ((*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[0] * (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[1]);
@@ -410,6 +420,11 @@ namespace vmesh {
       // The values are the same as if getBlockCoordinates(globalID,&(array[0])) was called
       // [Datatype conversion]
       // I2F and F2I
+      // Assessment: 
+      // Not a real chance of optimization
+      // Reason:
+      // indices[x] is unit_32_t
+      // all other parties are Real, still inevitable datatype conversion i2f if we want to use indices at all
       array[0] = (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].meshMinLimits[0] + indices[0]*(*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].blockSize[0];
       array[1] = (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].meshMinLimits[1] + indices[1]*(*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].blockSize[1];
       array[2] = (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].meshMinLimits[2] + indices[2]*(*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].blockSize[2];
@@ -524,6 +539,13 @@ namespace vmesh {
          i = invalidBlockIndex();
       } else {
          // [Data conversion] I2F and F2I
+         // Assessment: Not a real chance of optimization
+         // Reason:
+         // i is unit_32_t
+         // (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[0] is LocalID (unit_32_t)
+         // despite all are int, compiler might implement int div/mod using a fast 
+         // reciprocal-based algorithm that goes through floating-point 
+         // temporarily (convert → approximate reciprocal/divide → convert back)
          i = globalID % (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[0];
       }
    }
@@ -533,6 +555,14 @@ namespace vmesh {
          j = invalidBlockIndex();
       } else {
          // [Data conversion] I2F and F2I
+         // Assessment: Not a real chance of optimization
+         // Reason:
+         // j is unit_32_t
+         // (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[0] is LocalID (unit_32_t)
+         // (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[1] is LocalID (unit_32_t)
+         // despite all are int, compiler might implement int div/mod using a fast 
+         // reciprocal-based algorithm that goes through floating-point 
+         // temporarily (convert → approximate reciprocal/divide → convert back)
          j = (globalID / (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[0]) % (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[1];
       }
    }
@@ -542,6 +572,14 @@ namespace vmesh {
          k = invalidBlockIndex();
       } else {
          // [Data conversion] I2F and F2I
+         // Assessment: Not a real chance of optimization
+         // Reason:
+         // k is unit_32_t
+         // (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[0] is LocalID (unit_32_t)
+         // (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[1] is LocalID (unit_32_t)
+         // despite all are int, compiler might implement int div/mod using a fast 
+         // reciprocal-based algorithm that goes through floating-point 
+         // temporarily (convert → approximate reciprocal/divide → convert back)
          k = globalID / ((*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[0] * (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[1]);
       }
    }

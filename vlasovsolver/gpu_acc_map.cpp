@@ -259,16 +259,38 @@ __global__ void __launch_bounds__(GPUTHREADS,4) evaluate_column_extents_kernel(
 
       Realv max_intersectionMin = intersection +
       // [Datatype conversion] I2F
+      // Assessment: 
+      // Not a real chance of optimization
+      // Reason: 
+      // WID is defined in common.h as a integer
+      // Other are Realv (float) defined in vec.h
+      // It's not worth to change WID to float at definition level
+      // Because WID is the number of cells along one dimension of a velocity block.
+      // And it is used in many loops as an index -> will cause more I2F if we do so
          (setFirstBlockIndices0 * WID + 0) * intersection_di +
          (setFirstBlockIndices1 * WID + 0) * intersection_dj;
       max_intersectionMin =  std::max(max_intersectionMin,
                                       intersection +
                                       (setFirstBlockIndices0 * WID + 0) * intersection_di +
                                       // [Datatype conversion] I2F
+                                      // Assessment: 
+                                      // Not a real chance of optimization
+                                      // Reason: WID is an integer
+                                      // Other are Realv (float) defined in vec.h
+                                      // It's not worth to change WID to float at definition level
+                                      // Because WID is the number of cells along one dimension of a velocity block.
+                                      // And it is used in many loops as an index -> will cause more I2F if we do so
                                       (setFirstBlockIndices1 * WID + WID - 1) * intersection_dj);
       max_intersectionMin =  std::max(max_intersectionMin,
                                       intersection +
                                       // [Datatype conversion] I2F
+                                      // Assessment: 
+                                      // Not a real chance of optimization
+                                      // Reason: WID is an integer
+                                      // Other are Realv (float) defined in vec.h
+                                      // It's not worth to change WID to float at definition level
+                                      // Because WID is the number of cells along one dimension of a velocity block.
+                                      // And it is used in many loops as an index -> will cause more I2F if we do so
                                       (setFirstBlockIndices0 * WID + WID - 1) * intersection_di +
                                       (setFirstBlockIndices1 * WID + 0) * intersection_dj);
       max_intersectionMin =  std::max(max_intersectionMin,
@@ -319,6 +341,13 @@ __global__ void __launch_bounds__(GPUTHREADS,4) evaluate_column_extents_kernel(
           * lastBlockV is in z the maximum velocity value of the upper
           *  edge in source grid. */
           // [Datatype conversion] I2F
+          // Assessment: 
+          // Not a real chance of optimization
+          // Reason: WID is an integer
+          // Other are Realv (float) defined in vec.h
+          // It's not worth to change WID to float at definition level
+          // Because WID is the number of cells along one dimension of a velocity block.
+          // And it is used in many loops as an index -> will cause more I2F if we do so
          Realv firstBlockMinV = (WID * firstBlockIndices2) * dv + v_min;
          Realv lastBlockMaxV = (WID * (lastBlockIndices2 + 1)) * dv + v_min;
 
@@ -327,6 +356,12 @@ __global__ void __launch_bounds__(GPUTHREADS,4) evaluate_column_extents_kernel(
             plan, well max value here) and V of source grid, divided by
             intersection_dk to find out how many grid cells that is*/
          // [Datatype conversion] F2I
+         // Assessment: 
+         // Not a real chance of optimization
+         // Reason: firstBlockMinV, max_intersectionMin, intersection_dk are Realv (float)
+         // firstBlock_gk, lastBlock_gk are integers
+         // They are meant to be used as indices and are later used in loops as indices
+         // So should not change their datatypes to float
          const int firstBlock_gk = (int)((firstBlockMinV - max_intersectionMin)/intersection_dk);
          const int lastBlock_gk = (int)((lastBlockMaxV - min_intersectionMin)/intersection_dk);
 
@@ -432,7 +467,7 @@ __global__ void __launch_bounds__(VECL,4) acceleration_kernel(
    Vec *gpu_blockDataOrdered,
    uint *gpu_cell_indices_to_id,
    uint *gpu_block_indices_to_id,
-   // TODO::UseRestrict here?
+   // TODO::[Use Restrict] here?
    // Tho not recommanded by GPUscout
    const Column *gpu_columns,
    uint totalColumns,
@@ -475,8 +510,12 @@ __global__ void __launch_bounds__(VECL,4) acceleration_kernel(
             j_indices * gpu_cell_indices_to_id[1];
          const Realf intersection_min =
             intersection +
-            // [Datatype Conversion]
-            // I2F
+            // [Datatype Conversion] I2F
+            // Assessment: 
+            // Not a real chance of optimization
+            // Reason: 
+            // intersection, intersection_di/dj/dk, 
+            // intersection_min are geometric quantities (continuous offsets/slopes in velocity space
             // [Use Texture]
             (gpu_columns[column].i * WID + (Realv)i_indices) * intersection_di +
             (gpu_columns[column].j * WID + (Realv)j_indices) * intersection_dj;
@@ -514,6 +553,12 @@ __global__ void __launch_bounds__(VECL,4) acceleration_kernel(
             Realf target_density_r = 0.0;
 
             // [Datatype Conversion] I2F
+            // Assessment: 
+            // Not a real chance of optimization
+            // Reason: 
+            // v_r0, dv are Realv (float)
+            // k is an integer as loop index
+            // Not really worth to make index float
             const Realv v_r = v_r0  + (k+1)* dv;
             const Realv v_l = v_r0  + k* dv;
             const int lagrangian_gk_l = trunc((v_l-gk_intersection_max)/intersection_dk);
@@ -542,6 +587,14 @@ __global__ void __launch_bounds__(VECL,4) acceleration_kernel(
                //v_1 and v_2 normalized to be between 0 and 1 in the cell.
                //For vector elements where gk is already larger than needed (lagrangian_gk_r), v_2=v_1=v_r and thus the value is zero.
                // [Datatype Conversion] I2F
+               // Assessment: 
+               // Not a real chance of optimization
+               // Reason: 
+               // intersection_dk, intersection_min, v_l, v_r are Realv (float)
+               // i_dv is Realv (float)
+               // gk is an integer as loop index
+               // Not really worth to make index float
+               // gk is unchangable, then it's worthless to mark 1 as 1.0f
                const Realf v_norm_r = (  min(  max( (gk + 1) * intersection_dk + intersection_min, v_l), v_r) - v_l) * i_dv;
 
                /*shift, old right is new left*/

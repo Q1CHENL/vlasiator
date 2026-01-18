@@ -67,6 +67,13 @@ __global__ void reduce_v_dt_kernel(
    const Real dy = dev_dxdydz[3*cellIndex + 1];
    // [Use Texture]
    // [Datatype conversion] I2F
+   // Assessment: 
+   // Not a real chance of optimization
+   // Reason: 
+   // All parties are int
+   // This datatype conversion might refer to the later code:
+   // const Real Vx = blockInfo[0] + (i + HALF) * blockInfo[3] + EPS;
+   // Where conversion is also inevitable because we need int WID and ti to derive int i
    // [Use Restrict]
    const Real dz = dev_dxdydz[3*cellIndex + 2];
    const Real EPS = numeric_limits<Real>::min() * 1000;

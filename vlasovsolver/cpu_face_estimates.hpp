@@ -609,6 +609,9 @@ ARCH_DEV inline void compute_h4_left_face_value(const Vec * const values, uint k
 
 ARCH_DEV inline void compute_h4_left_face_value_nonuniform(const Realf * const h, const Vec * const u, uint k, Realf &fv_l, const int index) {
    // [Datatype Conversion] F2F
+   // Assessment: real chance of optimization (applied)
+   // Reason: 1.0 and 2.0 are double, all others are float
+   // 1.0f and 2.0f are float
    // [Use Restrict]
    fv_l = (
            1.0 / ( h[k - 2] + h[k - 1] + h[k] + h[k + 1] )

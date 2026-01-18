@@ -83,9 +83,31 @@ __global__ void __launch_bounds__(GPUTHREADS,4) blocksID_mapped_dim1_kernel(
       const vmesh::GlobalID GID = vmesh->getGlobalID(LID);
       // [Datatype Conversion]
       // I2F and F2I
+      // Assessment: 
+      // Not a real chance of optimization
+      // Reason: 
+      // LocalID and GlobalID are both defined in definitions.h as a unit_32_t
+      // DX is a vmesh::LocalID (unit_32_t)
+      // blocksID_mapped_sorted[i] is a vmesh::GlobalID (unit_32_t)
+      // column_id is vmesh::LocalID (unit_32_t)
+      // The reason why the I2F and F2I conversions happen is on compiler level
+      // Compiler often implements 32-bit integer div/mod using a fast 
+      // reciprocal-based algorithm that goes through floating-point 
+      // temporarily (convert → approximate reciprocal/divide → convert back)
       const vmesh::LocalID x_index = GID % D0;
       // [Datatype Conversion]
       // I2F and F2I
+      // Assessment: 
+      // Not a real chance of optimization
+      // Reason: 
+      // LocalID and GlobalID are both defined in definitions.h as a unit_32_t
+      // DX is a vmesh::LocalID (unit_32_t)
+      // blocksID_mapped_sorted[i] is a vmesh::GlobalID (unit_32_t)
+      // column_id is vmesh::LocalID (unit_32_t)
+      // The reason why the I2F and F2I conversions happen is on compiler level
+      // Compiler often implements 32-bit integer div/mod using a fast 
+      // reciprocal-based algorithm that goes through floating-point 
+      // temporarily (convert → approximate reciprocal/divide → convert back)
       const vmesh::LocalID y_index = (GID / D0) % D1;
       blocksID_mapped[LID] = GID - (x_index + y_index*D0) + y_index + x_index * D1;
       blocksLID_unsorted[LID]=LID;
@@ -109,12 +131,45 @@ __global__ void __launch_bounds__(GPUTHREADS,4) blocksID_mapped_dim2_kernel(
       const vmesh::GlobalID GID = vmesh->getGlobalID(LID);
       // [Datatype conversion]
       // I2F and F2I
+      // Assessment: 
+      // Not a real chance of optimization
+      // Reason: 
+      // LocalID and GlobalID are both defined in definitions.h as a unit_32_t
+      // DX is a vmesh::LocalID (unit_32_t)
+      // blocksID_mapped_sorted[i] is a vmesh::GlobalID (unit_32_t)
+      // column_id is vmesh::LocalID (unit_32_t)
+      // The reason why the I2F and F2I conversions happen is on compiler level
+      // Compiler often implements 32-bit integer div/mod using a fast 
+      // reciprocal-based algorithm that goes through floating-point 
+      // temporarily (convert → approximate reciprocal/divide → convert back)
       const vmesh::LocalID x_index = GID % D0;
       // [Datatype conversion]
       // I2F and F2I
+      // Assessment: 
+      // Not a real chance of optimization
+      // Reason: 
+      // LocalID and GlobalID are both defined in definitions.h as a unit_32_t
+      // DX is a vmesh::LocalID (unit_32_t)
+      // blocksID_mapped_sorted[i] is a vmesh::GlobalID (unit_32_t)
+      // column_id is vmesh::LocalID (unit_32_t)
+      // The reason why the I2F and F2I conversions happen is on compiler level
+      // Compiler often implements 32-bit integer div/mod using a fast 
+      // reciprocal-based algorithm that goes through floating-point 
+      // temporarily (convert → approximate reciprocal/divide → convert back)
       const vmesh::LocalID y_index = (GID / D0) % D1;
       // [Datatype conversion]
       // I2F and F2I
+      // Assessment: 
+      // Not a real chance of optimization
+      // Reason: 
+      // LocalID and GlobalID are both defined in definitions.h as a unit_32_t
+      // DX is a vmesh::LocalID (unit_32_t)
+      // blocksID_mapped_sorted[i] is a vmesh::GlobalID (unit_32_t)
+      // column_id is vmesh::LocalID (unit_32_t)
+      // The reason why the I2F and F2I conversions happen is on compiler level
+      // Compiler often implements 32-bit integer div/mod using a fast 
+      // reciprocal-based algorithm that goes through floating-point 
+      // temporarily (convert → approximate reciprocal/divide → convert back)
       const vmesh::LocalID z_index = (GID / (D0*D1));
       blocksID_mapped[LID] = z_index + y_index*D2 + x_index*D1*D2;
       blocksLID_unsorted[LID]=LID;
@@ -164,6 +219,16 @@ __global__ void __launch_bounds__(GPUTHREADS,4) order_GIDs_kernel(
 
       // [Datatype Conversion]
       // I2F and F2I
+      // Assessment: 
+      // Not a real chance of optimization
+      // Reason: 
+      // LocalID and GlobalID are both defined in definitions.h as a unit_32_t
+      // DX is a vmesh::LocalID (unit_32_t)
+      // blocksID_mapped_sorted[i] is a vmesh::GlobalID (unit_32_t)
+      // column_id is vmesh::LocalID (unit_32_t)
+      // The reason why the I2F and F2I conversions happen is on compiler level
+      // Compiler often implements 32-bit integer div/mod using a fast 
+      // reciprocal-based algorithm that goes through floating-point 
       const vmesh::LocalID column_id = blocksID_mapped_sorted[index] / DX;
       // Increment number of blocks in column
       const vmesh::LocalID old  = atomicAdd(&gpu_columnNBlocks[column_id],1);
@@ -247,6 +312,19 @@ __global__ void __launch_bounds__(GPUTHREADS,4) construct_columns_kernel(
       // identifies a particular column
       // [Datatype conversion]
       // F2I and I2F
+      //
+      // Assessment: 
+      // Not a real chance of optimization
+      //
+      // Reason: 
+      // LocalID and GlobalID are both defined in definitions.h as a unit_32_t
+      // DX is a vmesh::LocalID (unit_32_t)
+      // blocksID_mapped_sorted[i] is a vmesh::GlobalID (unit_32_t)
+      // column_id is vmesh::LocalID (unit_32_t)
+      // The reason why the I2F and F2I conversions happen is on compiler level
+      // Compiler often implements 32-bit integer div/mod using a fast 
+      // reciprocal-based algorithm that goes through floating-point 
+      // temporarily (convert → approximate reciprocal/divide → convert back)
       const vmesh::LocalID column_id = blocksID_mapped_sorted[i] / DX;
       // identifies a particular block in a column (along the dimension)
       const vmesh::LocalID dimension_id = blocksID_mapped_sorted[i] % DX;
@@ -302,6 +380,18 @@ __global__ void __launch_bounds__(GPUTHREADS,4) construct_columns_kernel(
                // This evaluates if the block at the target point is no longer within the same column
                // [Datatype conversion]
                // I2F and F2I
+               // Assessment: 
+               // Not a real chance of optimization
+               // Reason: 
+               // LocalID and GlobalID are both defined in definitions.h as a unit_32_t
+               // DX is a vmesh::LocalID (unit_32_t)
+               // blocksID_mapped_sorted[i+ci+ti] is a vmesh::GlobalID (unit_32_t)
+               // dimension_id is vmesh::LocalID (unit_32_t)
+               // ci+ti is vmesh::LocalID (unit_32_t)
+               // The reason why the I2F and F2I conversions happen is on compiler level
+               // Compiler often implements 32-bit integer div/mod using a fast 
+               // reciprocal-based algorithm that goes through floating-point 
+               // temporarily (convert → approximate reciprocal/divide → convert back)
                if ( (blocksID_mapped_sorted[i+ci+ti] % DX) == (dimension_id + ci+ti) &&
                     ( (blocksID_mapped_sorted[i+ci+ti] / DX) == column_id ) ) {
                   notInColumn = 0;
