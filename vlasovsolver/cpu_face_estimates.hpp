@@ -542,6 +542,17 @@ ARCH_DEV inline void compute_h8_left_face_value(const Vec * const values, uint k
 {
    // [Datatype Conversion]
    // F2F
+   #ifdef SDP
+   fv_l = 1.0f/840.0f * (
+              - 3.0f * values[k - 4][index]
+              + 29.0f * values[k - 3][index]
+              - 139.0f * values[k - 2][index]
+              + 533.0f * values[k - 1][index]
+              + 533.0f * values[k][index]
+              - 139.0f * values[k + 1][index]
+              + 29.0f * values[k + 2][index]
+              - 3.0f * values[k + 3][index]);
+   #else
    fv_l = 1.0/840.0 * (
               - 3.0 * values[k - 4][index]
               + 29.0 * values[k - 3][index]
@@ -551,9 +562,21 @@ ARCH_DEV inline void compute_h8_left_face_value(const Vec * const values, uint k
               - 139.0 * values[k + 1][index]
               + 29.0 * values[k + 2][index]
               - 3.0 * values[k + 3][index]);
+   #endif
 }
 ARCH_DEV inline void compute_h7_left_face_derivative(const Vec * const values, uint k, Realf &fd_l, const int index){
-    fd_l = 1.0/5040.0 * (
+   #ifdef SDP
+   fd_l = 1.0f/5040.0f * (
+       + 9.0f * values[k - 4][index]
+       - 119.0f * values[k - 3][index]
+       + 889.0f * values[k - 2][index]
+       - 7175.0f * values[k - 1][index]
+       + 7175.0f * values[k][index]
+       - 889.0f * values[k + 1][index]
+       + 119.0f * values[k + 2][index]
+       - 9.0f * values[k + 3][index]);
+   #else
+   fd_l = 1.0/5040.0 * (
        + 9.0 * values[k - 4][index]
        - 119.0 * values[k - 3][index]
        + 889.0 * values[k - 2][index]
@@ -561,8 +584,8 @@ ARCH_DEV inline void compute_h7_left_face_derivative(const Vec * const values, u
        + 7175.0 * values[k][index]
        - 889.0 * values[k + 1][index]
        + 119.0 * values[k + 2][index]
-       // [Datatype Conversion]
        - 9.0 * values[k + 3][index]);
+   #endif
 }
 ARCH_DEV inline void compute_h6_left_face_value(const Vec * const values, uint k, Realf &fv_l, const int index)
 {
@@ -583,16 +606,31 @@ ARCH_DEV inline void compute_h5_left_face_derivative(const Vec * const values, u
 ARCH_DEV inline void compute_h5_face_values(const Vec * const values, uint k, Realf &fv_l, Realf &fv_r, const int index)
 {
   //compute left values
-  fv_l = 1.0/60.0 * (- 3.0 * values[k - 2][index]
+  // [Datatype Conversion] F2F
+  #ifdef SDP
+  fv_l = 1.0f/60.0f * (- 3.0f * values[k - 2][index]
+                     + 27.0f * values[k - 1][index]
+                     + 47.0f * values[k ][index]
+                     - 13.0f * values[k + 1][index]
+                     + 2.0f * values[k + 2][index]);
+  // [Datatype Conversion] F2F
+  fv_r = 1.0f/60.0f * ( 2.0f * values[k - 2][index]
+                     - 13.0f * values[k - 1][index]
+                     + 47.0f * values[k][index]
+                     + 27.0f * values[k + 1][index]
+                     - 3.0f * values[k + 2][index]);
+   #else
+   fv_l = 1.0/60.0 * (- 3.0 * values[k - 2][index]
                      + 27.0 * values[k - 1][index]
                      + 47.0 * values[k ][index]
                      - 13.0 * values[k + 1][index]
                      + 2.0 * values[k + 2][index]);
-  fv_r = 1.0/60.0 * ( 2.0 * values[k - 2][index]
+   fv_r = 1.0/60.0 * ( 2.0 * values[k - 2][index]
                      - 13.0 * values[k - 1][index]
                      + 47.0 * values[k][index]
                      + 27.0 * values[k + 1][index]
                      - 3.0 * values[k + 2][index]);
+   #endif
 }
 ARCH_DEV inline void compute_h4_left_face_derivative(const Vec * const values, uint k, Realf &fd_l, const int index)
 {
@@ -607,22 +645,36 @@ ARCH_DEV inline void compute_h4_left_face_value(const Vec * const values, uint k
                       - 1.0 * values[k + 1][index]);
 }
 
+// __device__ function that is called inside a __global__ function (kernel)
 ARCH_DEV inline void compute_h4_left_face_value_nonuniform(const Realf * const h, const Vec * const u, uint k, Realf &fv_l, const int index) {
    // [Datatype Conversion] F2F
    // Assessment: real chance of optimization (applied)
    // Reason: 1.0 and 2.0 are double, all others are float
    // 1.0f and 2.0f are float
    // [Use Restrict]
+   #ifdef SDP
    fv_l = (
-           1.0 / ( h[k - 2] + h[k - 1] + h[k] + h[k + 1] )
+           1.0f / ( h[k - 2] + h[k - 1] + h[k] + h[k + 1] )
            * ( ( h[k - 2] + h[k - 1] ) * ( h[k] + h[k + 1] ) / ( h[k - 1] + h[k] )
                * ( u[k - 1][index] * h[k] + u[k][index] * h[k - 1] )
-               * (1.0 / ( h[k - 2] + h[k - 1] + h[k] ) + 1.0 / ( h[k - 1] + h[k] + h[k + 1] ) )
+               * (1.0f / ( h[k - 2] + h[k - 1] + h[k] ) + 1.0f / ( h[k - 1] + h[k] + h[k + 1] ) )
                + ( h[k] * ( h[k] + h[k + 1] ) ) / ( ( h[k - 2] + h[k - 1] + h[k] ) * (h[k - 2] + h[k - 1] ) )
-               * ( u[k - 1][index] * (h[k - 2] + 2.0 * h[k - 1] ) - ( u[k - 2][index] * h[k - 1] ) )
+               * ( u[k - 1][index] * (h[k - 2] + 2.0f * h[k - 1] ) - ( u[k - 2][index] * h[k - 1] ) )
                + h[k - 1] * ( h[k - 2] + h[k - 1] ) / ( ( h[k - 1] + h[k] + h[k + 1] ) * ( h[k] + h[k + 1] ) )
-               * ( u[k][index] * ( 2.0 * h[k] + h[k + 1] ) - u[k + 1][index] * h[k] ) )
+               * ( u[k][index] * ( 2.0f * h[k] + h[k + 1] ) - u[k + 1][index] * h[k] ) )
            );
+   #else
+   fv_l = (
+           1 / ( h[k - 2] + h[k - 1] + h[k] + h[k + 1] )
+           * ( ( h[k - 2] + h[k - 1] ) * ( h[k] + h[k + 1] ) / ( h[k - 1] + h[k] )
+               * ( u[k - 1][index] * h[k] + u[k][index] * h[k - 1] )
+               * (1 / ( h[k - 2] + h[k - 1] + h[k] ) + 1 / ( h[k - 1] + h[k] + h[k + 1] ) )
+               + ( h[k] * ( h[k] + h[k + 1] ) ) / ( ( h[k - 2] + h[k - 1] + h[k] ) * (h[k - 2] + h[k - 1] ) )
+               * ( u[k - 1][index] * (h[k - 2] + 2 * h[k - 1] ) - ( u[k - 2][index] * h[k - 1] ) )
+               + h[k - 1] * ( h[k - 2] + h[k - 1] ) / ( ( h[k - 1] + h[k] + h[k + 1] ) * ( h[k] + h[k + 1] ) )
+               * ( u[k][index] * ( 2 * h[k] + h[k + 1] ) - u[k + 1][index] * h[k] ) )
+           );
+   #endif
 }
 
 
@@ -683,7 +735,12 @@ ARCH_DEV inline void compute_filtered_face_values_derivatives(const Vec * const 
    {
       //Go to linear (PLM) estimates if not ok (this is always ok!)
       // [Datatype Conversion] F2F
+      #ifdef SPF
+      fv_l= (filter) ? values[k ][index] - slope_sign * 0.5f * slope_abs : fv_l;
+      #else
       fv_l= (filter) ? values[k ][index] - slope_sign * 0.5 * slope_abs : fv_l;
+      #endif
+
       fd_l= (filter) ? slope_sign * slope_abs : fd_l;
    }
    //Fix right face if needed; boundary value is not bounded or slope is not consistent
@@ -692,7 +749,11 @@ ARCH_DEV inline void compute_filtered_face_values_derivatives(const Vec * const 
    {
       //Go to linear (PLM) estimates if not ok (this is always ok!)
       // [Datatype Conversion] F2F
+      #ifdef SPF
+      fv_r= (filter) ? values[k][index] + slope_sign * 0.5f * slope_abs : fv_r;
+      #else
       fv_r= (filter) ? values[k][index] + slope_sign * 0.5 * slope_abs : fv_r;
+      #endif
       fd_r= (filter) ? slope_sign * slope_abs : fd_r;
    }
 }
@@ -794,14 +855,28 @@ ARCH_DEV inline void compute_filtered_face_values_nonuniform(const Realf * const
    if ((values[k -1][index] - fv_l) * (fv_l - values[k][index]) < 0) {
       //Go to linear (PLM) estimates if not ok (this is always ok!)
       // [Datatype Conversion] F2F
-      fv_l=values[k][index] - slope_sign * 0.5 * slope_abs;
+      // Assessment: real chance of optimization (applied)
+      // Reason: 0.5 is double, all others are float
+      // 0.5f is float
+      #ifdef SPF
+      fv_l=values[k][index] - slope_sign * 0.5f * slope_abs;
+      #else
+      fv_l=values[k ][index] - slope_sign * 0.5 * slope_abs;
+      #endif
    }
 
    //Fix  face if needed; boundary value is not bounded
    if ((values[k + 1][index] - fv_r) * (fv_r - values[k][index]) < 0) {
       //Go to linear (PLM) estimates if not ok (this is always ok!)
       // [Datatype Conversion] F2F
+      // Assessment: real chance of optimization (applied)
+      // Reason: 0.5 is double, all others are float
+      // 0.5f is float
+      #ifdef SPF
+      fv_r=values[k][index] + slope_sign * 0.5f * slope_abs;
+      #else
       fv_r=values[k][index] + slope_sign * 0.5 * slope_abs;
+      #endif
    }
 }
 

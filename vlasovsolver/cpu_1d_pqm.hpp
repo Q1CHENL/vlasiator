@@ -186,9 +186,15 @@ static ARCH_DEV inline void filter_pqm_monotonicity(Vec *values, uint k, Realf &
 
    /*second derivative coefficients, eq 23 in white et al.*/
    // [Datatype Conversion] F2F
+   #ifdef SPF
+   Realf b0 =   60.0f * values[k][index] - 24.0f * fv_r - 36.0f * fv_l + 3.0f * (fd_r - 3.0f * fd_l);
+   Realf b1 = -360.0f * values[k][index] + 36.0f * fd_l - 24.0f * fd_r + 168.0f * fv_r + 192.0f * fv_l;
+   Realf b2 =  360.0f * values[k][index] + 30.0f * (fd_r - fd_l) - 180.0f * (fv_l + fv_r);
+   #else
    Realf b0 =   60.0 * values[k][index] - 24.0 * fv_r - 36.0 * fv_l + 3.0 * (fd_r - 3.0 * fd_l);
    Realf b1 = -360.0 * values[k][index] + 36.0 * fd_l - 24.0 * fd_r + 168.0 * fv_r + 192.0 * fv_l;
    Realf b2 =  360.0 * values[k][index] + 30.0 * (fd_r - fd_l) - 180.0 * (fv_l + fv_r);
+   #endif
    /*let's compute sqrt value to be used for computing roots. If we
     take sqrt of negaitve numbers, then we instead set a value that
     will make the root to be +-100 which is well outside range
@@ -198,10 +204,16 @@ static ARCH_DEV inline void filter_pqm_monotonicity(Vec *values, uint k, Realf &
    // Intentional, explained by the comments above
    const Realf val_to_sqrt = b1 * b1 - 4 * b0 * b2;
    // [Warp Divergence]
+   // [Datatype Conversion] F2F
+   #ifdef SPF
+   const Realf sqrt_val = (val_to_sqrt < 0.0f) ?
+                               b1 + 200.0f * b2 :
+                               sqrt(val_to_sqrt);
+   #else
    const Realf sqrt_val = (val_to_sqrt < 0.0) ?
                                b1 + 200.0 * b2 :
-                               // [Datatype Conversion] F2F
                                sqrt(val_to_sqrt);
+   #endif
    //compute roots. Division is safe with vectorclass (=inf)
    const Realf root1 = (b2 != 0) ? (-b1 + sqrt_val) / (2 * b2) : 0;
    const Realf root2 = (b2 != 0) ? (-b1 - sqrt_val) / (2 * b2) : 0;
@@ -244,45 +256,77 @@ static ARCH_DEV inline void filter_pqm_monotonicity(Vec *values, uint k, Realf &
       {
          //collapse to left edge (eq 21)
          // [Datatype Conversion] F2F
-         fda_l =  1.0 / 3.0 * ( 10 * valuesa - 2.0 * fva_r - 8.0 * fva_l);
+         #ifdef SPF
+         fda_l =  1.0f / 3.0f * (10.0f * valuesa - 2.0f * fva_r - 8.0f * fva_l);
+         fda_r =  -10.0f * valuesa + 6.0f * fva_r + 4.0f * fva_l;
+         #else
+         fda_l =  1.0 / 3.0 * (10.0 * valuesa - 2.0 * fva_r - 8.0 * fva_l);
          fda_r =  -10.0 * valuesa + 6.0 * fva_r + 4.0 * fva_l;
+         #endif
          //check if PLM slope is consistent (eq 28 & 29)
          // [Warp Divergence]
          if (slope_signa * fda_l < 0)
          {
-            fda_l =  0;
-            fva_r =  5 * valuesa - 4 * fva_l;
-            fda_r =  20 * (valuesa - fva_l);
+            #ifdef SPF
+            fda_l =  0.0f;
+            fva_r =  5.0f * valuesa - 4.0f * fva_l;
+            fda_r =  20.0f * (valuesa - fva_l);
+            #else
+            fda_l =  0.0;
+            fva_r =  5.0 * valuesa - 4.0 * fva_l;
+            fda_r =  20.0 * (valuesa - fva_l);
+            #endif
          }
-         // [Warp Divergence]
          else if (slope_signa * fda_r < 0)
          {
-            fda_r =  0;
+            #ifdef SPF
+            fda_r =  0.0f;
+            fva_l =  0.5f * (5.0f * valuesa - 3.0f * fva_r);
+            fda_l =  10.0f / 3.0f * (-valuesa + fva_r);
+            #else
+            fda_r =  0.0;
             fva_l =  0.5 * (5 * valuesa - 3 * fva_r);
             fda_l =  10.0 / 3.0 * (-valuesa + fva_r);
+            #endif
          }
       }
       else
       {
          //collapse to right edge (eq 21)
          // [Datatype Conversion] F2F
+         #ifdef SPF
+         fda_l =  10.0f * valuesa - 6.0f * fva_l - 4.0f * fva_r;
+         fda_r =  1.0f / 3.0f * ( - 10.0f * valuesa + 2.0f * fva_l + 8.0f * fva_r);
+         #else
          fda_l =  10.0 * valuesa - 6.0 * fva_l - 4.0 * fva_r;
          fda_r =  1.0 / 3.0 * ( - 10.0 * valuesa + 2 * fva_l + 8 * fva_r);
+         #endif
          //check if PLM slope is consistent (eq 28 & 29)
          // [Warp Divergence]
          if (slope_signa * fda_l < 0)
          {
+            #ifdef SPF
+            fda_l =  0.0f;
+            fva_r =  0.5f * (5.0f * valuesa - 3.0f * fva_l);
+            fda_r =  10.0f / 3.0f * (valuesa - fva_l);
+            #else
             fda_l =  0;
             fva_r =  0.5 * ( 5 * valuesa - 3 * fva_l);
-            // [Datatype Conversion] F2F
             fda_r =  10.0 / 3.0 * (valuesa - fva_l);
+            #endif
          }
          // [Warp Divergence]
          else if (slope_signa * fda_r < 0)
          {
+            #ifdef SPF
+            fda_r =  0.0f;
+            fva_l =  5.0f * valuesa - 4.0f * fva_r;
+            fda_l =  20.0f * ( - valuesa + fva_r);
+            #else
             fda_r =  0;
             fva_l =  5 * valuesa - 4 * fva_r;
             fda_l =  20.0 * ( - valuesa + fva_r);
+            #endif
          }
       }
       fv_l = (Realf)fva_l;
@@ -308,9 +352,15 @@ static ARCH_DEV inline void compute_pqm_coeff(Vec *values, face_estimate_order o
    a[1] = fd_l/2.0;
    // [Datatype Conversion] F2F
    // [Warp Divergence]
+   #ifdef SPF
+   a[2] =  10.0f * values[k][index] - 4.0f * fv_r - 6.0f * fv_l + 0.5f * (fd_r - 3.0f * fd_l);
+   a[3] = -15.0f * values[k][index]  + 1.5f * fd_l - fd_r + 7.0f * fv_r + 8.0f * fv_l;
+   a[4] =   6.0f * values[k][index] +  0.5f * (fd_r - fd_l) - 3.0f * (fv_l + fv_r);
+   #else
    a[2] =  10.0 * values[k][index] - 4.0 * fv_r - 6.0 * fv_l + 0.5 * (fd_r - 3 * fd_l);
    a[3] = -15.0 * values[k][index]  + 1.5 * fd_l - fd_r + 7.0 * fv_r + 8 * fv_l;
    a[4] =   6.0 * values[k][index] +  0.5 * (fd_r - fd_l) - 3.0 * (fv_l + fv_r);
+   #endif
 }
 
 

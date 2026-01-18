@@ -80,23 +80,51 @@ ARCH_DEV inline void compute_ppm_coeff_nonuniform(const Realf * const dv, const 
 
    // [Datatype Conversion] F2F
    // [Warp Divergence]
+   // Assessment: real chance of optimization (applied)
+   // Reason: 0.5 is double, all others are float
+   // 0.5f, 1.f/6.f are float
+   #ifdef SPF
+   m_face = ((p_face - m_face) * (values[k][index] - 0.5f * (m_face + p_face)) >
+             (p_face - m_face)*(p_face - m_face) * (1.f/6.f)) ?
+             3.0f * values[k][index] - 2.0f * p_face :
+                   m_face;
+   #else
    m_face = ((p_face - m_face) * (values[k][index] - 0.5 * (m_face + p_face)) >
              (p_face - m_face)*(p_face - m_face) * (1./6.)) ?
-             3 * values[k][index] - 2 * p_face :
+             3.0 * values[k][index] - 2.0 * p_face :
                    m_face;
+   #endif
    // [Datatype Conversion] F2F
+   // Assessment: real chance of optimization (applied)
+   // Reason: 0.5 is double, all others are float
+   // 0.5f, 1.f/6.f are float
+   #ifdef SPF
+   p_face = (-(p_face - m_face) * (p_face - m_face) * (1.f/6.f)) >
+             (p_face - m_face) * (values[k][index] - 0.5f * (m_face + p_face)) ?
+             3.0f * values[k][index] - 2.0f * m_face :
+             p_face;
+   #else
    p_face = (-(p_face - m_face) * (p_face - m_face) * (1./6.)) >
-                   (p_face - m_face) * (values[k][index] - 0.5 * (m_face + p_face)) ?
-                   3 * values[k][index] - 2 * m_face :
-                   p_face;
+             (p_face - m_face) * (values[k][index] - 0.5 * (m_face + p_face)) ?
+             3.0 * values[k][index] - 2.0 * m_face :
+             p_face;
+   #endif
 
    //Fit a second order polynomial for reconstruction see, e.g., White
    //2008 (PQM article) (note additional integration factors built in,
    //contrary to White (2008) eq. 4
    // [Datatype Conversion] F2F
+   // Assessment: real chance of optimization (applied)
+   // Reason: 0.5 is double, all others are float
+   // 0.5f, 2.0f, 3.0f are float
    a[0] = m_face;
+   #ifdef SPF
+   a[1] = 3.0f * values[k][index] - 2.0f * m_face - p_face;
+   a[2] = (m_face + p_face - 2.0f * values[k][index]);
+   #else
    a[1] = 3.0 * values[k][index] - 2.0 * m_face - p_face;
    a[2] = (m_face + p_face - 2.0 * values[k][index]);
+   #endif
 }
 
 #endif
