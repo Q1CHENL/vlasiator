@@ -146,6 +146,7 @@ __global__ void __launch_bounds__(WID3, 4) translation_kernel(
    const Realv vz_min = randovmesh->getMeshMinLimits()[dimension];
 
    // Acting on velocity block blockGID, now found from array
+   // [Warp Divergence]
    for (uint thisBlockIndex = startingBlockIndex + blockIdx.x; thisBlockIndex < nAllBlocks; thisBlockIndex += blockIndexIncrement) {
       if (thisBlockIndex >= nAllBlocks) {
          break;
@@ -344,7 +345,9 @@ __global__ void __launch_bounds__(WID3, 4) translation_kernel(
                   //atomicAdd(&block_data_p1[ti],p1Contribution);
                   block_data_p1[ti] += p1Contribution;
                }
+               // [Warp Divergence]
                if (areaRatio_m1 && block_data_m1) {
+                  // [Warp Divergence]
                   const Realf m1Contribution = (!positiveTranslationDirection ? ngbr_target_density
                      // [Datatype Conversion] F2F
                      // Assessment: real chance of optimization (applied)

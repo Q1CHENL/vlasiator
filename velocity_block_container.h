@@ -634,6 +634,7 @@ namespace vmesh {
          const vmesh::LocalID currentCapacity = block_data->capacity()/WID3;
          // no meaningful warp divergence
          // 0% detected
+         // [Warp Divergence]
          assert(newSize <= currentCapacity && "ERROR! Attempting to grow block container on-device beyond capacity (::push_back N_blocks).");
          block_data->device_resize((newSize)*WID3,false); //construct=false don't construct or set to zero
          // [Use Restrict]

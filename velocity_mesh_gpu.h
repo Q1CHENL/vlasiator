@@ -503,6 +503,7 @@ namespace vmesh {
    ARCH_HOSTDEV inline vmesh::GlobalID VelocityMesh::getGlobalID(const vmesh::LocalID& i,const vmesh::LocalID& j,const vmesh::LocalID& k) const {
       // [Warp Divergence]
       if (i >= (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[0]) return invalidGlobalID();
+      // [Warp Divergence]
       if (j >= (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[1]) return invalidGlobalID();
       if (k >= (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[2]) return invalidGlobalID();
       return i + j * (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[0]
@@ -587,6 +588,7 @@ namespace vmesh {
          // despite all are int, compiler might implement int div/mod using a fast 
          // reciprocal-based algorithm that goes through floating-point 
          // temporarily (convert → approximate reciprocal/divide → convert back)
+         // [Warp Divergence]
          k = globalID / ((*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[0] * (*(vmesh::getMeshWrapper()->velocityMeshes))[meshID].gridLength[1]);
       }
    }

@@ -203,9 +203,11 @@ static ARCH_DEV inline void filter_pqm_monotonicity(Vec *values, uint k, Realf &
    // e.g 2.5% Branch divergence
    // Intentional, explained by the comments above
    const Realf val_to_sqrt = b1 * b1 - 4 * b0 * b2;
-   // [Warp Divergence]
+
+
    // [Datatype Conversion] F2F
    #ifdef SPF
+   // [Warp Divergence]
    const Realf sqrt_val = (val_to_sqrt < 0.0f) ?
                                b1 + 200.0f * b2 :
                                sqrt(val_to_sqrt);
@@ -277,6 +279,7 @@ static ARCH_DEV inline void filter_pqm_monotonicity(Vec *values, uint k, Realf &
             fda_r =  20.0 * (valuesa - fva_l);
             #endif
          }
+         // [Warp Divergence]
          else if (slope_signa * fda_r < 0)
          {
             #ifdef SPF
@@ -350,9 +353,11 @@ static ARCH_DEV inline void compute_pqm_coeff(Vec *values, face_estimate_order o
    //contrary to White (2008) eq. 4
    a[0] = fv_l;
    a[1] = fd_l/2.0;
+
+
    // [Datatype Conversion] F2F
-   // [Warp Divergence]
    #ifdef SPF
+   // [Warp Divergence]
    a[2] =  10.0f * values[k][index] - 4.0f * fv_r - 6.0f * fv_l + 0.5f * (fd_r - 3.0f * fd_l);
    a[3] = -15.0f * values[k][index]  + 1.5f * fd_l - fd_r + 7.0f * fv_r + 8.0f * fv_l;
    a[4] =   6.0f * values[k][index] +  0.5f * (fd_r - fd_l) - 3.0f * (fv_l + fv_r);
@@ -361,6 +366,8 @@ static ARCH_DEV inline void compute_pqm_coeff(Vec *values, face_estimate_order o
    a[3] = -15.0 * values[k][index]  + 1.5 * fd_l - fd_r + 7.0 * fv_r + 8 * fv_l;
    a[4] =   6.0 * values[k][index] +  0.5 * (fd_r - fd_l) - 3.0 * (fv_l + fv_r);
    #endif
+
+
 }
 
 

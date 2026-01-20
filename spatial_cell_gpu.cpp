@@ -99,6 +99,7 @@ __global__ void __launch_bounds__(WID3,4) update_velocity_block_content_lists_ke
       // [Warp Divergence]
       // warp-uniform
       if (b_tid < GPUTHREADS) {
+         // [Warp Divergence]
          if (has_content[0]) {
             vbwcl_map->warpInsert(blockGID,blockLID,b_tid);
          } else {
@@ -197,6 +198,8 @@ __global__ void update_neighbour_halo_kernel (
    for (uint i=0; i<neighbour_count; i++) {
       // dev_neigh_Nvbwcls is just a id that is only read, not write, no need to use restrict
       // [Warp Divergence]
+      // [Use Restrict]
+      // [Use Texture]
       if (myindex < (int)dev_neigh_Nvbwcls[neigh_i]) {
          break;
       }

@@ -111,7 +111,9 @@ __global__ void __launch_bounds__(VECL,4) reorder_blocks_by_dimension_kernel(
                int jk = j / (VECL/WID);
                // [Use Shared]
                int sourceindex = input_0 * gpu_cell_indices_to_id[0]
+                  // [Use Shared]
                   + input_1 * gpu_cell_indices_to_id[1]
+                  // [Use Shared]
                   + input_2 * gpu_cell_indices_to_id[2];
 
                gpu_blockDataOrdered[outputOffset + i_pcolumnv_gpu_b(jk, k, b, columnLength)][ti]
@@ -443,6 +445,7 @@ __global__ void __launch_bounds__(GPUTHREADS,4) evaluate_column_extents_kernel(
                }
 
             }
+            // [Warp Divergence]
             if(isTargetBlock[blockK]==0 && isSourceBlock[blockK]!=0 )  {
                const int targetBlock =
                   setFirstBlockIndices0 * gpu_block_indices_to_id[0] +
