@@ -1,0 +1,71 @@
+# # CUDA-enabled Makefile for Vlasov solvers # 
+
+#======= Enable CUDA Compilation =======
+USE_CUDA=1
+
+#======== Vectorization ==========
+ifeq ($(DISTRIBUTION_FP_PRECISION),SPF)
+	VECTORCLASS = VEC_FALLBACK_GENERIC
+else
+	VECTORCLASS = VEC_FALLBACK_GENERIC
+endif
+
+#===== Vector Lengths ====
+WID=4
+VECL=16
+
+#======= GPU architecture =========
+GPU_ARCH = sm_90  # adjust to your GPU compute capability
+
+#======= Compiler =========
+CMP = nvcc -ccbin g++
+LNK = nvcc -ccbin g++
+
+#======= Include paths =========
+INC_HOME    = -I$(HOME)/include
+INC_SYSTEM  = -I/usr/include
+INC_MPI     = -I$(SPACK_ROOT)/opt/spack/linux-zen4/openmpi-5.0.9-jsgywf7bfvyc7sood7yli3y7fowrtkgg/include
+INC_CUDA    = -isystem $(SPACK_ROOT)/opt/spack/linux-zen4/cuda-12.1.1-wpanx4p55gom63mhv5mid7cvba4mu73i/include
+
+INC_BOOST = -I/home/ge43fij2/boost_1_72_0/include
+INC_ZOLTAN  = -I/home/ge43fij2/Zoltan/src/include \
+              -I/home/ge43fij2/zoltan-build/src/include
+INC_VLSV    = -I/home/ge43fij2/vlsv
+INC_PROFILE = -I/home/ge43fij2/phiprof/include
+INC_EIGEN   = -isystem ./submodules/eigen/
+INC_DCCRG   = -I./submodules/dccrg
+INC_FSGRID  = -I./submodules/fsgrid
+INC_HASHINATOR = -isystem ./submodules/hashinator/
+
+CXXFLAGS = -g -O3 -x cu -std=c++17 \
+           --extended-lambda --expt-relaxed-constexpr \
+           -gencode arch=compute_90,code=sm_90 \
+           --generate-line-info \
+           -Xcompiler -fopenmp \
+           -Xcompiler="-w -pedantic -fpermissive" \
+           -Xcudafe --diag_suppress=3128 \
+           $(INC_HOME) $(INC_SYSTEM) $(INC_MPI) $(INC_CUDA) \
+           $(INC_BOOST) $(INC_ZOLTAN) $(INC_VLSV) $(INC_PROFILE) \
+           $(INC_EIGEN) $(INC_DCCRG) $(INC_FSGRID) $(INC_HASHINATOR)
+
+# ========= Test package =========
+testpackage: CXXFLAGS = -g -O2 -x cu -std=c++17 --extended-lambda --expt-relaxed-constexpr -gencode arch=compute_90,code=sm_90 --generate-line-info -Xcompiler -fopenmp -Xcompiler="-fpermissive"
+testpackage: MATHFLAGS = --prec-sqrt=true --prec-div=true --ftz=false --fmad=false
+
+#======= Library paths =========
+LIB_HOME    = -L$(HOME)/lib
+LIB_CUDA    = -L$(SPACK_ROOT)/opt/spack/linux-zen4/cuda-12.1.1-wpanx4p55gom63mhv5mid7cvba4mu73i/lib64
+LIB_BOOST = -L/home/ge43fij2/boost_1_72_0/lib -lboost_program_options
+LIB_ZOLTAN = -L/home/ge43fij2/zoltan-build/src -lzoltan
+LIB_VLSV    = -L/home/ge43fij2/vlsv -lvlsv
+LIB_PROFILE = -L/home/ge43fij2/phiprof/lib -lphiprof
+
+# MPI + OpenMP
+MPI_LIB_PATH = -L$(SPACK_ROOT)/opt/spack/linux-zen4/openmpi-5.0.9-jsgywf7bfvyc7sood7yli3y7fowrtkgg/lib
+LIB_MPI = $(MPI_LIB_PATH) -lmpi -lgomp
+
+# Linker flags with proper rpath handling for nvcc
+LDFLAGS = -g $(LIB_HOME) $(LIB_CUDA) \
+          -Xlinker -rpath -Xlinker /home/ge43fij2/opt/spack/opt/spack/linux-zen4/openmpi-5.0.9-jsgywf7bfvyc7sood7yli3y7fowrtkgg/lib \
+          $(LIB_BOOST) $(LIB_ZOLTAN) $(LIB_VLSV) $(LIB_PROFILE) \
+          $(LIB_MPI)
