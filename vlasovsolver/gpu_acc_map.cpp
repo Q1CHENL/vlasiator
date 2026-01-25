@@ -84,6 +84,10 @@ __global__ void __launch_bounds__(VECL,4) reorder_blocks_by_dimension_kernel(
    const int ti = threadIdx.x;
    const uint iColumn = blockIdx.x;
    Realf *gpu_blockData = blockContainer->getData();
+
+   // __shared__ vmesh::LocalID lid_shared;
+
+
    // [Warp Divergence]
    if (nThreads != VECL) {
       if (ti==0) printf("Warning! VECL not matching thread count for GPU kernel!\n");
@@ -97,6 +101,10 @@ __global__ void __launch_bounds__(VECL,4) reorder_blocks_by_dimension_kernel(
       // Loop over column blocks
       // [Warp Divergence]
       for (uint b = 0; b < columnLength; b++) {
+         // if (ti==0) {
+         //    lid_shared = gpu_LIDlist[inputOffset + b];
+         // }
+         // __syncthreads();
          // Slices
          for (uint k=0; k<WID; ++k) {
             // Each block slice can span multiple VECLs (equal to gputhreads per block)
@@ -119,9 +127,11 @@ __global__ void __launch_bounds__(VECL,4) reorder_blocks_by_dimension_kernel(
                gpu_blockDataOrdered[outputOffset + i_pcolumnv_gpu_b(jk, k, b, columnLength)][ti]
                // [Use Restrict]
                // [Use Shared]
+                  // = gpu_blockData[ lid_shared * WID3
+                  //                  + sourceindex ];
+
                   = gpu_blockData[ gpu_LIDlist[inputOffset + b] * WID3
                                    + sourceindex ];
-
             } // end loop k (layers per block)
          } // end loop b (blocks per column)
       } // end loop j (vecs per layer)
