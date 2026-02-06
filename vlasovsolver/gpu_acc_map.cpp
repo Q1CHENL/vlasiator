@@ -529,6 +529,8 @@ __global__ void __launch_bounds__(VECL,4) acceleration_kernel(
             // Reason: 
             // intersection, intersection_di/dj/dk, 
             // intersection_min are geometric quantities (continuous offsets/slopes in velocity space
+            // they are Realv, either float or double depending on compile flag
+            // column.i/j are int
             // [Use Texture]
             (gpu_columns[column].i * WID + (Realv)i_indices) * intersection_di +
             (gpu_columns[column].j * WID + (Realv)j_indices) * intersection_dj;

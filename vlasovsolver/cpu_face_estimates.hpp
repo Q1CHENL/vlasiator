@@ -542,7 +542,7 @@ ARCH_DEV inline void compute_h8_left_face_value(const Vec * const values, uint k
 {
    // [Datatype Conversion]
    // F2F
-   #ifdef SDP
+   #ifdef SPF
    fv_l = 1.0f/840.0f * (
               - 3.0f * values[k - 4][index]
               + 29.0f * values[k - 3][index]
@@ -565,7 +565,7 @@ ARCH_DEV inline void compute_h8_left_face_value(const Vec * const values, uint k
    #endif
 }
 ARCH_DEV inline void compute_h7_left_face_derivative(const Vec * const values, uint k, Realf &fd_l, const int index){
-   #ifdef SDP
+   #ifdef SPF
    fd_l = 1.0f/5040.0f * (
        + 9.0f * values[k - 4][index]
        - 119.0f * values[k - 3][index]
@@ -607,7 +607,7 @@ ARCH_DEV inline void compute_h5_face_values(const Vec * const values, uint k, Re
 {
   //compute left values
   // [Datatype Conversion] F2F
-  #ifdef SDP
+  #ifdef SPF
   fv_l = 1.0f/60.0f * (- 3.0f * values[k - 2][index]
                      + 27.0f * values[k - 1][index]
                      + 47.0f * values[k ][index]
@@ -652,7 +652,7 @@ ARCH_DEV inline void compute_h4_left_face_value_nonuniform(const Realf * const h
    // Reason: 1.0 and 2.0 are double, all others are float
    // 1.0f and 2.0f are float
    // [Use Restrict]
-   #ifdef SDP
+   #ifdef SPF
    fv_l = (
            1.0f / ( h[k - 2] + h[k - 1] + h[k] + h[k + 1] )
            * ( ( h[k - 2] + h[k - 1] ) * ( h[k] + h[k + 1] ) / ( h[k - 1] + h[k] )
