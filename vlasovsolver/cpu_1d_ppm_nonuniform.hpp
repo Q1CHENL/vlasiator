@@ -83,7 +83,7 @@ ARCH_DEV inline void compute_ppm_coeff_nonuniform(const Realf * const dv, const 
    // Assessment: real chance of optimization (applied)
    // Reason: 0.5 is double, all others are float
    // 0.5f, 1.f/6.f are float
-   #ifdef SPF
+   #if defined(SPF) && defined(DATATYPE_CONVERSION_OPTIMIZATION)
    m_face = ((p_face - m_face) * (values[k][index] - 0.5f * (m_face + p_face)) >
              (p_face - m_face)*(p_face - m_face) * (1.f/6.f)) ?
              3.0f * values[k][index] - 2.0f * p_face :
@@ -98,7 +98,7 @@ ARCH_DEV inline void compute_ppm_coeff_nonuniform(const Realf * const dv, const 
    // Assessment: real chance of optimization (applied)
    // Reason: 0.5 is double, all others are float
    // 0.5f, 1.f/6.f are float
-   #ifdef SPF
+   #if defined(SPF) && defined(DATATYPE_CONVERSION_OPTIMIZATION)
    p_face = (-(p_face - m_face) * (p_face - m_face) * (1.f/6.f)) >
              (p_face - m_face) * (values[k][index] - 0.5f * (m_face + p_face)) ?
              3.0f * values[k][index] - 2.0f * m_face :
@@ -118,7 +118,7 @@ ARCH_DEV inline void compute_ppm_coeff_nonuniform(const Realf * const dv, const 
    // Reason: 0.5 is double, all others are float
    // 0.5f, 2.0f, 3.0f are float
    a[0] = m_face;
-   #ifdef SPF
+   #if defined(SPF) && defined(DATATYPE_CONVERSION_OPTIMIZATION)
    a[1] = 3.0f * values[k][index] - 2.0f * m_face - p_face;
    a[2] = (m_face + p_face - 2.0f * values[k][index]);
    #else

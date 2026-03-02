@@ -186,7 +186,7 @@ static ARCH_DEV inline void filter_pqm_monotonicity(Vec *values, uint k, Realf &
 
    /*second derivative coefficients, eq 23 in white et al.*/
    // [Datatype Conversion] F2F
-   #ifdef SPF
+   #if defined(SPF) && defined(DATATYPE_CONVERSION_OPTIMIZATION)
    Realf b0 =   60.0f * values[k][index] - 24.0f * fv_r - 36.0f * fv_l + 3.0f * (fd_r - 3.0f * fd_l);
    Realf b1 = -360.0f * values[k][index] + 36.0f * fd_l - 24.0f * fd_r + 168.0f * fv_r + 192.0f * fv_l;
    Realf b2 =  360.0f * values[k][index] + 30.0f * (fd_r - fd_l) - 180.0f * (fv_l + fv_r);
@@ -206,7 +206,7 @@ static ARCH_DEV inline void filter_pqm_monotonicity(Vec *values, uint k, Realf &
 
 
    // [Datatype Conversion] F2F
-   #ifdef SPF
+   #if defined(SPF) && defined(DATATYPE_CONVERSION_OPTIMIZATION)
    // [Warp Divergence]
    const Realf sqrt_val = (val_to_sqrt < 0.0f) ?
                                b1 + 200.0f * b2 :
@@ -258,7 +258,7 @@ static ARCH_DEV inline void filter_pqm_monotonicity(Vec *values, uint k, Realf &
       {
          //collapse to left edge (eq 21)
          // [Datatype Conversion] F2F
-         #ifdef SPF
+         #if defined(SPF) && defined(DATATYPE_CONVERSION_OPTIMIZATION)
          fda_l =  1.0f / 3.0f * (10.0f * valuesa - 2.0f * fva_r - 8.0f * fva_l);
          fda_r =  -10.0f * valuesa + 6.0f * fva_r + 4.0f * fva_l;
          #else
@@ -269,7 +269,7 @@ static ARCH_DEV inline void filter_pqm_monotonicity(Vec *values, uint k, Realf &
          // [Warp Divergence]
          if (slope_signa * fda_l < 0)
          {
-            #ifdef SPF
+            #if defined(SPF) && defined(DATATYPE_CONVERSION_OPTIMIZATION)
             fda_l =  0.0f;
             fva_r =  5.0f * valuesa - 4.0f * fva_l;
             fda_r =  20.0f * (valuesa - fva_l);
@@ -282,7 +282,7 @@ static ARCH_DEV inline void filter_pqm_monotonicity(Vec *values, uint k, Realf &
          // [Warp Divergence]
          else if (slope_signa * fda_r < 0)
          {
-            #ifdef SPF
+            #if defined(SPF) && defined(DATATYPE_CONVERSION_OPTIMIZATION)
             fda_r =  0.0f;
             fva_l =  0.5f * (5.0f * valuesa - 3.0f * fva_r);
             fda_l =  10.0f / 3.0f * (-valuesa + fva_r);
@@ -297,7 +297,7 @@ static ARCH_DEV inline void filter_pqm_monotonicity(Vec *values, uint k, Realf &
       {
          //collapse to right edge (eq 21)
          // [Datatype Conversion] F2F
-         #ifdef SPF
+         #if defined(SPF) && defined(DATATYPE_CONVERSION_OPTIMIZATION)
          fda_l =  10.0f * valuesa - 6.0f * fva_l - 4.0f * fva_r;
          fda_r =  1.0f / 3.0f * ( - 10.0f * valuesa + 2.0f * fva_l + 8.0f * fva_r);
          #else
@@ -308,7 +308,7 @@ static ARCH_DEV inline void filter_pqm_monotonicity(Vec *values, uint k, Realf &
          // [Warp Divergence]
          if (slope_signa * fda_l < 0)
          {
-            #ifdef SPF
+            #if defined(SPF) && defined(DATATYPE_CONVERSION_OPTIMIZATION)
             fda_l =  0.0f;
             fva_r =  0.5f * (5.0f * valuesa - 3.0f * fva_l);
             fda_r =  10.0f / 3.0f * (valuesa - fva_l);
@@ -321,7 +321,7 @@ static ARCH_DEV inline void filter_pqm_monotonicity(Vec *values, uint k, Realf &
          // [Warp Divergence]
          else if (slope_signa * fda_r < 0)
          {
-            #ifdef SPF
+            #if defined(SPF) && defined(DATATYPE_CONVERSION_OPTIMIZATION)
             fda_r =  0.0f;
             fva_l =  5.0f * valuesa - 4.0f * fva_r;
             fda_l =  20.0f * ( - valuesa + fva_r);
@@ -356,7 +356,7 @@ static ARCH_DEV inline void compute_pqm_coeff(Vec *values, face_estimate_order o
 
 
    // [Datatype Conversion] F2F
-   #ifdef SPF
+   #if defined(SPF) && defined(DATATYPE_CONVERSION_OPTIMIZATION)
    // [Warp Divergence]
    a[2] =  10.0f * values[k][index] - 4.0f * fv_r - 6.0f * fv_l + 0.5f * (fd_r - 3.0f * fd_l);
    a[3] = -15.0f * values[k][index]  + 1.5f * fd_l - fd_r + 7.0f * fv_r + 8.0f * fv_l;
